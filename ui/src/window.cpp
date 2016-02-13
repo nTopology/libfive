@@ -1,3 +1,4 @@
+#include <iostream>
 #include <glm/gtx/transform.hpp>
 #include <glm/gtx/string_cast.hpp>
 
@@ -107,7 +108,7 @@ void Window::mouseMove(double x, double y)
     auto new_cur = rawMousePos(x, y);
 
     // If we're panning, adjust the center position
-    if (drag_mode == WINDOW_DRAG_PAN)
+    if (drag_mode == DRAG_PAN)
     {
         // Find the starting position in world coordinates
         auto inv = glm::inverse(M());
@@ -117,13 +118,13 @@ void Window::mouseMove(double x, double y)
         center += glm::vec3(diff.x, diff.y, diff.z);
         render();
     }
-    else if (drag_mode == WINDOW_DRAG_ROTATE)
+    else if (drag_mode == DRAG_ROTATE)
     {
         roll -= mouse_pos.x - new_pos.x;
         pitch -= new_pos.y - mouse_pos.y;
         render();
     }
-    else if (drag_mode == WINDOW_DRAG_MOVE_WINDOW)
+    else if (drag_mode == DRAG_MOVE_WINDOW)
     {
         int xpos, ypos;
         glfwGetWindowPos(window, &xpos, &ypos);
@@ -134,7 +135,7 @@ void Window::mouseMove(double x, double y)
     mouse_pos = new_pos;
     cursor_pos = new_cur;
 
-    if (drag_mode != WINDOW_DRAG_NONE)
+    if (drag_mode != DRAG_NONE)
     {
         draw();
     }
@@ -144,33 +145,33 @@ void Window::mouseButton(int button, int action, int mods)
 {
     (void)mods;
 
+    double x;
+    double y;
+    glfwGetCursorPos(window, &x, &y);
+    mouse_pos = scaledMousePos(x, y);
+
     if (action == GLFW_PRESS)
     {
         if (button == GLFW_MOUSE_BUTTON_1)
         {
             if (y < 20)
             {
-                drag_mode = WINDOW_DRAG_MOVE_WINDOW;
+                drag_mode = DRAG_MOVE_WINDOW;
             }
             else
             {
-                drag_mode = WINDOW_DRAG_PAN;
+                drag_mode = DRAG_PAN;
             }
         }
         else if (button == GLFW_MOUSE_BUTTON_2)
         {
-            drag_mode = WINDOW_DRAG_ROTATE;
+            drag_mode = DRAG_ROTATE;
         }
     }
     else
     {
-        drag_mode = WINDOW_DRAG_NONE;
+        drag_mode = DRAG_NONE;
     }
-
-    double x;
-    double y;
-    glfwGetCursorPos(window, &x, &y);
-    mouse_pos = scaledMousePos(x, y);
 }
 
 void Window::mouseScroll(double sx, double sy)

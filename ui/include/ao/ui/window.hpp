@@ -173,10 +173,11 @@ protected:
     float pitch=0;
     float  roll=0;
 
-    enum { WINDOW_DRAG_NONE,
-           WINDOW_DRAG_PAN,
-           WINDOW_DRAG_ROTATE,
-           WINDOW_DRAG_MOVE_WINDOW} drag_mode=WINDOW_DRAG_NONE;
+    enum { DRAG_NONE,
+           DRAG_PAN,
+           DRAG_ROTATE,
+           DRAG_MOVE_WINDOW,
+           DRAG_SCALE_WINDOW} drag_mode=DRAG_NONE;
 
     /*  This is the current mouse position (in -1, 1 window coordinates)  */
     glm::vec2 mouse_pos;
