@@ -90,10 +90,21 @@ glm::vec2 Window::scaledMousePos(double x, double y) const
     return glm::vec2((2*x)/w - 1, 1 - (2*y)/h);
 }
 
+glm::ivec2 Window::rawMousePos(double x, double y) const
+{
+    int xpos, ypos;
+    glfwGetWindowPos(window, &xpos, &ypos);
+
+    return glm::ivec2(x + xpos, y + ypos);
+}
+
 void Window::mouseMove(double x, double y)
 {
     // Scale coordinates to the range -1, 1
     auto new_pos = scaledMousePos(x, y);
+
+    // Get new cursor position in screen space
+    auto new_cur = rawMousePos(x, y);
 
     // If we're panning, adjust the center position
     if (drag_mode == WINDOW_DRAG_PAN)
@@ -112,8 +123,16 @@ void Window::mouseMove(double x, double y)
         pitch -= new_pos.y - mouse_pos.y;
         render();
     }
+    else if (drag_mode == WINDOW_DRAG_MOVE_WINDOW)
+    {
+        int xpos, ypos;
+        glfwGetWindowPos(window, &xpos, &ypos);
+        glfwSetWindowPos(window, xpos + (new_cur.x - cursor_pos.x),
+                                 ypos + (new_cur.y - cursor_pos.y));
+    }
 
     mouse_pos = new_pos;
+    cursor_pos = new_cur;
 
     if (drag_mode != WINDOW_DRAG_NONE)
     {
@@ -129,7 +148,14 @@ void Window::mouseButton(int button, int action, int mods)
     {
         if (button == GLFW_MOUSE_BUTTON_1)
         {
-            drag_mode = WINDOW_DRAG_PAN;
+            if (y < 20)
+            {
+                drag_mode = WINDOW_DRAG_MOVE_WINDOW;
+            }
+            else
+            {
+                drag_mode = WINDOW_DRAG_PAN;
+            }
         }
         else if (button == GLFW_MOUSE_BUTTON_2)
         {

@@ -124,6 +124,11 @@ protected:
     glm::vec2 scaledMousePos(double x, double y) const;
 
     /*
+     *  Returns a mouse position in integer screen coordinates
+     */
+    glm::ivec2 rawMousePos(double x, double y) const;
+
+    /*
      *  Resized window callback
      */
     static void _resized(GLFWwindow* window, int w, int h);
@@ -170,10 +175,15 @@ protected:
 
     enum { WINDOW_DRAG_NONE,
            WINDOW_DRAG_PAN,
-           WINDOW_DRAG_ROTATE} drag_mode=WINDOW_DRAG_NONE;
+           WINDOW_DRAG_ROTATE,
+           WINDOW_DRAG_MOVE_WINDOW} drag_mode=WINDOW_DRAG_NONE;
 
     /*  This is the current mouse position (in -1, 1 window coordinates)  */
     glm::vec2 mouse_pos;
+
+    /*  This is the current mouse position in global coordinates    *
+     *  (where 0,0 is the top left corner of the screen)            */
+    glm::ivec2 cursor_pos;
 
     /*  Objects to draw in 3D viewport  */
     Axes axes;
