@@ -11,6 +11,7 @@
 #include "ao/ui/gl/core.hpp"
 #include "ao/ui/gl/frame.hpp"
 #include "ao/ui/gl/axes.hpp"
+#include "ao/ui/gl/border.hpp"
 
 class Tree;
 
@@ -188,8 +189,16 @@ protected:
 
     /*  Objects to draw in 3D viewport  */
     Axes axes;
+    Border border;
     std::map<std::string, std::map<std::string, Frame*>> frames;
+
+    /*  Shader strings to draw window border  */
+    std::string vert;
+    std::string frag;
 
     /*  Frames that should be deleted once they are done rendering  */
     std::list<Frame*> stale;
+
+    /*  Border for dragging window around  */
+    static const int BORDER=30;
 };

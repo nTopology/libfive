@@ -1,4 +1,3 @@
-#include <iostream>
 #include <glm/gtx/transform.hpp>
 #include <glm/gtx/string_cast.hpp>
 
@@ -131,11 +130,33 @@ void Window::mouseMove(double x, double y)
         glfwSetWindowPos(window, xpos + (new_cur.x - cursor_pos.x),
                                  ypos + (new_cur.y - cursor_pos.y));
     }
+    else if (drag_mode == DRAG_SCALE_WINDOW)
+    {
+        int xpos, ypos;
+        glfwGetWindowPos(window, &xpos, &ypos);
+
+        int w;
+        int h;
+        glfwHideWindow(window);
+        glfwGetWindowSize(window, &w, &h);
+        w = std::max(100, w + new_cur.x - cursor_pos.x);
+        h = std::max(100, h + new_cur.y - cursor_pos.y);
+
+        glfwSetWindowSize(window, w, h);
+        glfwSetWindowPos(window, xpos, ypos);
+        glfwShowWindow(window);
+    }
+
+    bool hover_changed =
+        (mouse_pos.x > -1 && mouse_pos.x < 1 &&
+         mouse_pos.y > -1 && mouse_pos.y < 1) !=
+        (new_pos.x > -1 && new_pos.x < 1 &&
+         new_pos.y > -1 && new_pos.y < 1);
 
     mouse_pos = new_pos;
     cursor_pos = new_cur;
 
-    if (drag_mode != DRAG_NONE)
+    if (drag_mode != DRAG_NONE || hover_changed)
     {
         draw();
     }
@@ -154,9 +175,17 @@ void Window::mouseButton(int button, int action, int mods)
     {
         if (button == GLFW_MOUSE_BUTTON_1)
         {
-            if (y < 20)
+            int w;
+            int h;
+            glfwGetWindowSize(window, &w, &h);
+
+            if (y < BORDER)
             {
                 drag_mode = DRAG_MOVE_WINDOW;
+            }
+            else if (x > w - BORDER && y > h - BORDER)
+            {
+                drag_mode = DRAG_SCALE_WINDOW;
             }
             else
             {
@@ -244,6 +273,15 @@ void Window::draw() const
         }
     }
     axes.draw(m);
+    glDisable(GL_DEPTH_TEST);
+
+    if (drag_mode == DRAG_MOVE_WINDOW ||
+        drag_mode == DRAG_SCALE_WINDOW ||
+        (mouse_pos.x > -1 && mouse_pos.x < 1 &&
+         mouse_pos.y > -1 && mouse_pos.y < 1))
+    {
+        border.draw(width, height, BORDER);
+    }
 
     glfwSwapBuffers(window);
 }
