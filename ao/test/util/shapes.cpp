@@ -114,3 +114,9 @@ Tree box(const Eigen::Vector3f& lower, const Eigen::Vector3f& upper)
                max(lower.z() - Tree::Z(),
                    Tree::Z() - upper.z()));
 }
+
+Tree CylinderYAxis(Eigen::Vector3f start, float r) {   
+  return r*r 
+    - square(Tree::X() - start.x()) 
+    - square(Tree::Z() - start.z());
+}

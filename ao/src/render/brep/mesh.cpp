@@ -178,65 +178,123 @@ void Mesh::line(const Eigen::Vector3f& a, const Eigen::Vector3f& b)
 ////////////////////////////////////////////////////////////////////////////////
 
 bool Mesh::saveSTL(const std::string& filename,
-                   const std::list<const Mesh*>& meshes)
+                   const std::list<const Mesh*>& meshes,
+                   bool isBinary)
 {
     if (!boost::algorithm::iends_with(filename, ".stl"))
     {
         std::cerr << "Mesh::saveSTL: filename \"" << filename
                   << "\" does not end in .stl" << std::endl;
-    }
-    std::ofstream file;
-    file.open(filename, std::ios::out);
-    if (!file.is_open())
-    {
-        std::cout << "Mesh::saveSTL: could not open " << filename
-                  << std::endl;
         return false;
     }
 
-    // File header (giving human-readable info about file type)
-    std::string header = "This is a binary STL exported from Ao.";
-    file.write(header.c_str(), header.length());
-
-    // Pad the rest of the header to 80 bytes
-    for (int i=header.length(); i < 80; ++i)
+    
+    if (isBinary)
     {
-        file.put(' ');
-    }
+      FILE * stl_file = fopen(filename.c_str(), "wb");
+      if (stl_file == NULL)
+      {
+        std::cerr << "IOError: " << filename << " could not be opened for writing." << std::endl;
+        return false;
+      }
 
-    // Write the triangle count to the file
-    uint32_t num = std::accumulate(meshes.begin(), meshes.end(), (uint32_t)0,
-            [](uint32_t i, const Mesh* m){ return i + m->branes.size(); });
-    file.write(reinterpret_cast<char*>(&num), sizeof(num));
 
-    for (const auto& m : meshes)
-    {
+      std::string header = "This is a binary STL exported from Ao.";
+      // Write unused 80-char header
+      for (auto h : header)
+      {
+        fwrite(&h, sizeof(char), 1, stl_file);
+      }
+
+      // Write the rest of the 80-char header
+      for (auto h = header.size(); h < 80; h++)
+      {
+        char o = '_';
+        fwrite(&o, sizeof(char), 1, stl_file);
+      }
+
+      // Write number of triangles
+      unsigned int num_tri = std::accumulate(meshes.begin(), meshes.end(), 0,
+                                             [](unsigned int i, const Mesh* m)
+      {
+        return i + m->branes.size();
+      });
+      fwrite(&num_tri, sizeof(unsigned int), 1, stl_file);
+
+
+      for (const auto& m : meshes)
+      {
         for (const auto& t : m->branes)
         {
-            // Write out the normal vector for this face (all zeros)
-            float norm[3] = {0, 0, 0};
-            file.write(reinterpret_cast<char*>(&norm), sizeof(norm));
+          // Write out the normal vector for this face (all zeros)
+          std::vector<float> n(3, 0);
+          fwrite(&n[0], sizeof(float), 3, stl_file);
 
-            // Iterate over vertices (which are indices into the verts list)
-            for (unsigned i=0; i < 3; ++i)
-            {
-                auto v = m->verts[t[i]];
-                float vert[3] = {v.x(), v.y(), v.z()};
-                file.write(reinterpret_cast<char*>(&vert), sizeof(vert));
-            }
+          // Iterate over vertices (which are indices into the verts list)
+          for (unsigned i = 0; i < 3; ++i)
+          {
+            auto vert = m->verts[t[i]];
 
-            // Write out this face's attribute short
-            uint16_t attrib = 0;
-            file.write(reinterpret_cast<char*>(&attrib), sizeof(attrib));
+            std::vector<float> v(3);
+            v[0] = vert.x();
+            v[1] = vert.y();
+            v[2] = vert.z();
+            fwrite(&v[0], sizeof(float), 3, stl_file);
+          }
+
+          // Write out this face's attribute short
+          unsigned short att_count = 0;
+          fwrite(&att_count, sizeof(unsigned short), 1, stl_file);
         }
-    }
+      }
 
+      fclose(stl_file);
+    }
+    else //ASCII
+    {
+      auto* stl_file = fopen(filename.c_str(), "w");
+      if (stl_file == NULL)
+      {
+        std::cerr << "IOError: " << filename << " could not be opened for writing." << std::endl;
+        return false;
+      }
+      fprintf(stl_file, "solid %s\n", filename.c_str());
+
+      for (const auto& m : meshes)
+      {
+        for (const auto& t : m->branes)
+        {
+          // Write out the normal vector for this face (all zeros)
+          fprintf(stl_file, "facet normal ");
+          fprintf(stl_file, "0 0 0\n");
+
+          fprintf(stl_file, "outer loop\n");
+
+          // Iterate over vertices (which are indices into the verts list)
+          for (unsigned i = 0; i < 3; ++i)
+          {
+            auto v = m->verts[t[i]];
+           
+            fprintf(stl_file, 
+                    "vertex %e %e %e\n",
+                    (float)v.x(),
+                    (float)v.y(),
+                    (float)v.z());
+          }
+          fprintf(stl_file, "endloop\n");
+          fprintf(stl_file, "endfacet\n");
+        }
+      }
+      fprintf(stl_file, "endsolid %s\n", filename.c_str());
+      fclose(stl_file);
+    }
     return true;
 }
 
-bool Mesh::saveSTL(const std::string& filename)
+bool Mesh::saveSTL(const std::string& filename,
+                   bool isBinary/* = true*/)
 {
-    return saveSTL(filename, {this});
+  return saveSTL(filename, { this }, isBinary);
 }
 
 }   // namespace Kernel

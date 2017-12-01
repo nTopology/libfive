@@ -1,4 +1,10 @@
-add_library(ao-kernel SHARED
+if(MSVC)
+    set(LINK_TYPE STATIC)
+else()
+    set(LINK_TYPE SHARED)
+endif()
+
+add_library(ao-kernel ${LINK_TYPE}
     eval/base.cpp
     eval/eval_affine.cpp
     eval/eval_interval.cpp
@@ -25,8 +31,14 @@ add_library(ao-kernel SHARED
     ao.cpp
 )
 
-target_include_directories(ao-kernel SYSTEM PUBLIC
-    ${Boost_INCLUDE_DIRS}
+if(MSVC)
+    set(TARGET_DIR PUBLIC)
+else()
+    set(TARGET_DIR SYSTEM PRIVATE)
+endif()
+
+target_include_directories(ao-kernel ${TARGET_DIR}
+    ${BOOST_INCLUDE_DIR}
     ${PNG_INCLUDE_DIR}
     ${EIGEN_INCLUDE_DIRS}
 )
