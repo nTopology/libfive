@@ -1,12 +1,33 @@
+/*
+Studio: a simple GUI for the Ao CAD kernel
+Copyright (C) 2017  Matt Keeter
+
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 2
+of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+*/
 #pragma once
 
 #include <QObject>
+#include <QMutex>
 #include <QThread>
 #include <QTimer>
 #include <libguile.h>
 
-#include "gui/shape.hpp"
 #include "gui/editor.hpp"
+
+struct Documentation;
+class Shape;
 
 /*
  *  _Interpreter is a child object that lives in a secondary thread
@@ -34,6 +55,12 @@ signals:
      *  the syntax highlighter
      */
     void keywords(QString kws);
+
+    /*
+     *  Emitted to pass documentation to the main window
+     *  (for use in Documentation panes)
+     */
+    void docs(Documentation* docs);
 
     /*
      *  Emitted to return a list of Shapes for the renderer
@@ -103,6 +130,7 @@ signals:
     void gotResult(QString result);
     void gotError(QString error, QString stack, Editor::Range p);
     void keywords(QString kws);
+    void docs(Documentation* docs);
     void gotShapes(QList<Shape*> s);
     void gotVars(QMap<Kernel::Tree::Id, Editor::Range> vs);
 

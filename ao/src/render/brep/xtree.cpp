@@ -1,7 +1,27 @@
+/*
+Ao: a CAD kernel for modeling with implicit functions
+Copyright (C) 2017  Matt Keeter
+
+This library is free software; you can redistribute it and/or
+modify it under the terms of the GNU Lesser General Public
+License as published by the Free Software Foundation; either
+version 2.1 of the License, or (at your option) any later version.
+
+This library is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+Lesser General Public License for more details.
+
+You should have received a copy of the GNU Lesser General Public
+License along with this library; if not, write to the Free Software
+Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+*/
 #include <future>
 #include <numeric>
 #include <functional>
 #include <limits>
+
+#include <cmath>
 
 #include <Eigen/StdVector>
 
@@ -188,8 +208,14 @@ XTree<N>::XTree(XTreeEvaluator* eval, Region<N> region,
             for (uint8_t i=0; i < children.size(); ++i)
             {
                 // Handle inside, outside, and (non-ambiguous) on-boundary
-                if (ds.col(i).w() < 0)      { corners[i] = Interval::FILLED; }
-                else if (ds.col(i).w() > 0) { corners[i] = Interval::EMPTY; }
+                if (ds.col(i).w() > 0 || std::isnan(ds.col(i).w()))
+                {
+                    corners[i] = Interval::EMPTY;
+                }
+                else if (ds.col(i).w() < 0)
+                {
+                    corners[i] = Interval::FILLED;
+                }
                 else if (!ambig(i))
                 {
                     // Optimization for non-ambiguous features
@@ -377,11 +403,15 @@ XTree<N>::XTree(XTreeEvaluator* eval, Region<N> region,
 
                 for (unsigned e=0; e < target_count; ++e)
                 {
-                    for (unsigned j=0; j < POINTS_PER_SEARCH; ++j)
+                    // Skip one point, because the very first point is
+                    // already known to be inside the shape (but sometimes,
+                    // due to numerical issues, it registers as outside!)
+                    for (unsigned j=1; j < POINTS_PER_SEARCH; ++j)
                     {
                         const unsigned i = j + e*POINTS_PER_SEARCH;
                         if (out[i] > 0)
                         {
+                            assert(i > 0);
                             targets[e] = {ps.col(i - 1), ps.col(i)};
                             break;
                         }
@@ -392,9 +422,18 @@ XTree<N>::XTree(XTreeEvaluator* eval, Region<N> region,
                             if (!eval->feature.isInside(
                                         pos.template cast<float>()))
                             {
+                                assert(i > 0);
                                 targets[e] = {ps.col(i - 1), ps.col(i)};
                                 break;
                             }
+                        }
+                        // Special-case for final point in the search, working
+                        // around numerical issues where different evaluators
+                        // disagree with whether points are inside or outside.
+                        else if (j == POINTS_PER_SEARCH - 1)
+                        {
+                            targets[e] = {ps.col(i - 1), ps.col(i)};
+                            break;
                         }
                     }
                 }
@@ -591,7 +630,7 @@ double XTree<N>::findVertex(unsigned index)
     Eigen::Matrix<double, N, N> D = Eigen::Matrix<double, N, N>::Zero();
     for (unsigned i=0; i < N; ++i)
     {
-        D.diagonal()[i] = (std::abs(eigenvalues[i]) < EIGENVALUE_CUTOFF)
+        D.diagonal()[i] = (fabs(eigenvalues[i]) < EIGENVALUE_CUTOFF)
             ? 0 : (1 / eigenvalues[i]);
     }
 

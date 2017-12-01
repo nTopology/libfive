@@ -25,19 +25,19 @@ add_library(ao-kernel SHARED
     ao.cpp
 )
 
-target_include_directories(ao-kernel SYSTEM PRIVATE
-    ${BOOST_INCLUDE_DIR}
+target_include_directories(ao-kernel SYSTEM PUBLIC
+    ${Boost_INCLUDE_DIRS}
     ${PNG_INCLUDE_DIR}
+    ${EIGEN_INCLUDE_DIRS}
 )
 target_include_directories(ao-kernel PUBLIC
     ../include
-    ${EIGEN3_INCLUDE_DIR} # Eigen::Vector3f is used in APIs
 )
 
 set(LIBS ${PNG_LIBRARIES})
 
-if(UNIX)
+if(UNIX AND NOT(APPLE))
     set(LIBS ${LIBS} ${CMAKE_THREAD_LIBS_INIT})
-endif(UNIX)
+endif(UNIX AND NOT(APPLE))
 
 target_link_libraries(ao-kernel ${LIBS})

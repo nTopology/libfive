@@ -1,3 +1,21 @@
+/*
+Studio: a simple GUI for the Ao CAD kernel
+Copyright (C) 2017  Matt Keeter
+
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 2
+of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+*/
 #include <cmath>
 
 #include "gui/camera.hpp"
@@ -15,23 +33,24 @@ QMatrix4x4 Camera::proj() const
 
     //  Compress the Z axis to avoid clipping.  The exact value is arbitrary,
     //  but seems to work well for common model aspect ratios.
-    const float Z_COMPRESS = 8;
     const float frac = size.width() / float(size.height());
+    const float Z_COMPRESS = 8;
     if (frac > 1)
     {
-        m.scale(1/frac, -1, 1/Z_COMPRESS);
+        m.scale(1/frac, -1, 1 / Z_COMPRESS);
     }
     else
     {
-        m.scale(1, -frac, 1/Z_COMPRESS);
+        m.scale(1, -frac, 1 / Z_COMPRESS);
     }
+
+    m(3, 2) = perspective;
     return m;
 }
 
 QMatrix4x4 Camera::view() const
 {
     QMatrix4x4 m;
-    m(3, 2) = perspective;
     m.scale(scale, scale, scale);
     m.rotate(pitch, {1, 0, 0});
     m.rotate(yaw,   {0, 0, 1});
@@ -40,6 +59,10 @@ QMatrix4x4 Camera::view() const
     return m;
 }
 
+QMatrix4x4 Camera::M() const
+{
+    return proj() * view();
+}
 
 void Camera::rotateIncremental(QPoint delta)
 {

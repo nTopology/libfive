@@ -1,3 +1,21 @@
+/*
+Ao: a CAD kernel for modeling with implicit functions
+Copyright (C) 2017  Matt Keeter
+
+This library is free software; you can redistribute it and/or
+modify it under the terms of the GNU Lesser General Public
+License as published by the Free Software Foundation; either
+version 2.1 of the License, or (at your option) any later version.
+
+This library is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+Lesser General Public License for more details.
+
+You should have received a copy of the GNU Lesser General Public
+License along with this library; if not, write to the Free Software
+Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+*/
 #include "catch.hpp"
 
 #include "ao/render/discrete/voxels.hpp"
@@ -20,7 +38,7 @@ TEST_CASE("Voxels::pts values")
 
     SECTION("Expanding interval")
     {
-        auto a = Voxels({0, 0, 0}, {1.2, 1.2, 1.2}, 1);
+        auto a = Voxels({0, 0, 0}, {1.2f, 1.2f, 1.2f}, 1);
         REQUIRE(a.lower.x() == Approx(-0.4));
         REQUIRE(a.upper.x() == Approx(1.6));
         REQUIRE(a.pts[0][0] == Approx(0.1f));
@@ -49,7 +67,7 @@ TEST_CASE("Voxels::pts size")
 
     SECTION("Expanding interval")
     {
-        auto r = Voxels({0, 0, 0}, {1.1, 2.1, 3.1}, 1.0f);
+        auto r = Voxels({0, 0, 0}, {1.1f, 2.1f, 3.1f}, 1.0f);
         REQUIRE(r.pts[0].size() == 2);
         REQUIRE(r.pts[1].size() == 3);
         REQUIRE(r.pts[2].size() == 4);

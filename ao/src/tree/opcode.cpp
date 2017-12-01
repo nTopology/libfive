@@ -1,3 +1,21 @@
+/*
+Ao: a CAD kernel for modeling with implicit functions
+Copyright (C) 2017  Matt Keeter
+
+This library is free software; you can redistribute it and/or
+modify it under the terms of the GNU Lesser General Public
+License as published by the Free Software Foundation; either
+version 2.1 of the License, or (at your option) any later version.
+
+This library is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+Lesser General Public License for more details.
+
+You should have received a copy of the GNU Lesser General Public
+License along with this library; if not, write to the Free Software
+Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+*/
 #include <iostream>
 #include <map>
 
@@ -30,6 +48,7 @@ size_t Opcode::args(Opcode op)
         case EXP:
         case CONST_VAR:
         case ABS:
+        case LOG:
         case RECIP:
             return 1;
 
@@ -144,6 +163,7 @@ std::string Opcode::toOpString(Opcode op)
         case NTH_ROOT:
         case MOD:
         case NANFILL:
+        case LOG:
         case ABS:
             return toScmString(op);
 
@@ -188,6 +208,7 @@ bool Opcode::isCommutative(Opcode op)
         case MOD:
         case NANFILL:
         case INVALID:
+        case LOG:
         case ABS:
         case RECIP:
         case CONST_VAR:

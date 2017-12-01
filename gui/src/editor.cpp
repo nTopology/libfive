@@ -1,3 +1,21 @@
+/*
+Studio: a simple GUI for the Ao CAD kernel
+Copyright (C) 2017  Matt Keeter
+
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 2
+of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+*/
 #include <array>
 #include <set>
 #include <cassert>
@@ -9,7 +27,7 @@
 #include "gui/color.hpp"
 
 Editor::Editor(QWidget* parent)
-    : QWidget(parent), script(new QTextEdit), script_doc(script->document()),
+    : QWidget(parent), script(new Script), script_doc(script->document()),
       syntax(new Syntax(script_doc)), err(new QPlainTextEdit),
       err_doc(err->document())
 {
@@ -24,7 +42,7 @@ Editor::Editor(QWidget* parent)
         QFont font;
         font.setFamily("Courier");
         QFontMetrics fm(font);
-        script->setTabStopWidth(fm.width("    "));
+        script->setTabStopWidth(fm.width("  "));
         script_doc->setDefaultFont(font);
         err_doc->setDefaultFont(font);
         err->setFixedHeight(fm.height());
@@ -158,7 +176,18 @@ void Editor::setResult(QColor color, QString result)
 void Editor::setScript(const QString& s)
 {
     first_change = true;
+
+    // This is an terrible hack to work around QTBUG-20354:
+    // We temporary disable the syntax highlighter, then re-enable
+    // it after a timer fires.
+    syntax->disable();
+    auto timer = new QTimer;
+    timer->setSingleShot(true);
+    connect(timer, &QTimer::timeout, syntax, &Syntax::enable);
+    connect(timer, &QTimer::timeout, timer, &QTimer::deleteLater);
+
     script->setPlainText(s);
+    timer->start(0);
 }
 
 QString Editor::getScript() const

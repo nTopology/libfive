@@ -1,3 +1,21 @@
+/*
+Ao: a CAD kernel for modeling with implicit functions
+Copyright (C) 2017  Matt Keeter
+
+This library is free software; you can redistribute it and/or
+modify it under the terms of the GNU Lesser General Public
+License as published by the Free Software Foundation; either
+version 2.1 of the License, or (at your option) any later version.
+
+This library is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+Lesser General Public License for more details.
+
+You should have received a copy of the GNU Lesser General Public
+License along with this library; if not, write to the Free Software
+Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+*/
 #include <unordered_map>
 
 #include "ao/eval/tape.hpp"
@@ -66,7 +84,7 @@ Tape::Tape(const Tree root)
     {
         if (clauses.find(a.id()) == clauses.end())
         {
-            clauses[a.id()] = clauses.size();
+            clauses.insert({a.id(), clauses.size()});
         }
     }
 
@@ -92,14 +110,21 @@ Tape::Tape(const Tree root)
 void Tape::pop()
 {
     assert(tape != tapes.begin());
-    tape--;
+
+    if (tape->dummy > 1)
+    {
+        tape->dummy--;
+    }
+    else
+    {
+        tape--;
+    }
 }
 
 double Tape::utilization() const
 {
     return tape->t.size() / double(tapes.front().t.size());
 }
-
 
 Clause::Id Tape::rwalk(std::function<void(Opcode::Opcode, Clause::Id,
                                           Clause::Id, Clause::Id)> fn,
@@ -125,6 +150,14 @@ void Tape::push(std::function<Keep(Opcode::Opcode, Clause::Id,
                                    Clause::Id, Clause::Id)> fn,
                 Type t, Region<3> r)
 {
+    // Special-case: if this is a dummy tape, then increment the
+    // tape's depth and return immediately.
+    if (tape->dummy)
+    {
+        tape->dummy++;
+        return;
+    }
+
     // Since we'll be figuring out which clauses are disabled and
     // which should be remapped, we reset those arrays here
     std::fill(disabled.begin(), disabled.end(), true);
@@ -132,6 +165,7 @@ void Tape::push(std::function<Keep(Opcode::Opcode, Clause::Id,
 
     // Mark the root node as active
     disabled[tape->i] = false;
+    bool has_choices = false;
 
     for (const auto& c : tape->t)
     {
@@ -139,14 +173,15 @@ void Tape::push(std::function<Keep(Opcode::Opcode, Clause::Id,
         {
             switch (fn(c.op, c.id, c.a, c.b))
             {
-                case KEEP_A:    disabled[c.a] = false;
-                                remap[c.id] = c.a;
-                                break;
-                case KEEP_B:    disabled[c.b] = false;
-                                remap[c.id] = c.b;
-                                break;
-                case KEEP_BOTH: break;
-
+                case KEEP_A:        disabled[c.a] = false;
+                                    remap[c.id] = c.a;
+                                    break;
+                case KEEP_B:        disabled[c.b] = false;
+                                    remap[c.id] = c.b;
+                                    break;
+                case KEEP_BOTH:     has_choices = true;
+                                    break;
+                case KEEP_ALWAYS:   break;
             }
 
             if (!remap[c.id])
@@ -184,6 +219,7 @@ void Tape::push(std::function<Keep(Opcode::Opcode, Clause::Id,
 
     // Reset tape type
     tape->type = t;
+    tape->dummy = has_choices ? 0 : 1;
 
     // Now, use the data in disabled and remap to make the new tape
     for (const auto& c : prev_tape->t)
