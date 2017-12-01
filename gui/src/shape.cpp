@@ -1,3 +1,21 @@
+/*
+Studio: a simple GUI for the Ao CAD kernel
+Copyright (C) 2017  Matt Keeter
+
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 2
+of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+*/
 #include "gui/shape.hpp"
 #include "gui/shader.hpp"
 
@@ -6,8 +24,7 @@ const int Shape::MESH_DIV_ABORT;
 const int Shape::MESH_DIV_NEW_VARS;
 const int Shape::MESH_DIV_NEW_VARS_SMALL;
 
-Shape::Shape(Kernel::Tree t, std::shared_ptr<std::map<Kernel::Tree::Id,
-                                                      float>> vars)
+Shape::Shape(Kernel::Tree t, std::map<Kernel::Tree::Id, float> vars)
     : tree(t), vars(vars), vert_vbo(QOpenGLBuffer::VertexBuffer),
       tri_vbo(QOpenGLBuffer::IndexBuffer)
 {
@@ -15,7 +32,7 @@ Shape::Shape(Kernel::Tree t, std::shared_ptr<std::map<Kernel::Tree::Id,
     es.reserve(8);
     for (unsigned i=0; i < es.capacity(); ++i)
     {
-        es.emplace_back(Kernel::XTreeEvaluator(t, *vars));
+        es.emplace_back(Kernel::XTreeEvaluator(t, vars));
     }
 
     connect(this, &Shape::gotMesh, this, &Shape::redraw);
@@ -23,10 +40,18 @@ Shape::Shape(Kernel::Tree t, std::shared_ptr<std::map<Kernel::Tree::Id,
             this, &Shape::onFutureFinished);
 }
 
+Shape::~Shape()
+{
+    if (mesh_future.isRunning())
+    {
+        mesh_future.waitForFinished();
+    }
+}
+
 bool Shape::updateFrom(const Shape* other)
 {
     assert(other->id() == id());
-    return updateVars(*(other->vars));
+    return updateVars(other->vars);
 }
 
 bool Shape::updateVars(const std::map<Kernel::Tree::Id, float>& vs)
@@ -42,8 +67,8 @@ bool Shape::updateVars(const std::map<Kernel::Tree::Id, float>& vs)
 
     for (auto& v : vs)
     {
-        auto va = vars->find(v.first);
-        if (va != vars->end() && va->second != v.second)
+        auto va = vars.find(v.first);
+        if (va != vars.end() && va->second != v.second)
         {
             if (fabs(va->second - v.second) > 1e-6)
             {
@@ -126,22 +151,8 @@ void Shape::draw(const QMatrix4x4& M)
 
     if (gl_ready)
     {
-        QVector3D shade(0.9, 0.9, 0.9);
-        if (grabbed == true)
-        {
-            if (drag_valid == false)
-            {
-                shade = QVector3D(1.0, 0.78, 0.70);
-            }
-            else
-            {
-                shade = QVector3D(1, 1, 1);
-            }
-        }
-        else if (hover == true)
-        {
-            shade = QVector3D(1, 1, 1);
-        }
+        auto shade = (grabbed || hover) ? QVector3D(1, 1, 1)
+                                        : QVector3D(0.9, 0.9, 0.9);
 
         Shader::shaded->bind();
         glUniform3f(Shader::shaded->uniformLocation("shade"),
@@ -161,8 +172,8 @@ void Shape::drawMonochrome(const QMatrix4x4& M, QColor color)
         Shader::monochrome->bind();
         glUniformMatrix4fv(Shader::monochrome->uniformLocation("M"),
                            1, GL_FALSE, M.data());
-        glUniform3f(Shader::monochrome->uniformLocation("frag_color"),
-                color.redF(), color.greenF(), color.blueF());
+        glUniform4f(Shader::monochrome->uniformLocation("frag_color"),
+                color.redF(), color.greenF(), color.blueF(), 1.0f);
         vao.bind();
         glDrawElements(GL_TRIANGLES, mesh->branes.size() * 3, GL_UNSIGNED_INT, NULL);
         vao.release();
@@ -196,7 +207,7 @@ void Shape::startRender(QPair<Settings, int> s)
         {
             for (auto& e : es)
             {
-                e.updateVars(*vars);
+                e.updateVars(vars);
             }
             s.second = (s.second == MESH_DIV_NEW_VARS) ? default_div : 0;
         }
@@ -218,16 +229,6 @@ bool Shape::done() const
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-
-void Shape::setDragValid(bool happy)
-{
-    bool changed = happy != drag_valid;
-    drag_valid = happy;
-    if (changed)
-    {
-        emit(redraw());
-    }
-}
 
 void Shape::setGrabbed(bool g)
 {
@@ -254,7 +255,7 @@ void Shape::setHover(bool h)
 Kernel::JacobianEvaluator* Shape::dragFrom(const QVector3D& v)
 {
     auto e = new Kernel::JacobianEvaluator(
-            std::make_shared<Kernel::Tape>(tree), *vars);
+            std::make_shared<Kernel::Tape>(tree), vars);
     e->evalAndPush({v.x(), v.y(), v.z()});
     return e;
 }
@@ -306,6 +307,18 @@ void Shape::onFutureFinished()
                               || next.second == MESH_DIV_NEW_VARS_SMALL)
     {
         startRender(next);
+    }
+}
+
+void Shape::freeGL()
+{
+    if (gl_ready)
+    {
+        vao.destroy();
+        vert_vbo.destroy();
+        tri_vbo.destroy();
+
+        gl_ready = false;
     }
 }
 

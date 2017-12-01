@@ -1,3 +1,21 @@
+#|
+Guile bindings to the Ao CAD kernel
+Copyright (C) 2017  Matt Keeter
+
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 2
+of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+|#
 (use-modules (oop goops) (ice-9 textual-ports))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -40,6 +58,16 @@
 (define-method (/ (a <vec2>) (b <number>))
   (vec2 (/ (slot-ref a 'x) b)
         (/ (slot-ref a 'y) b)))
+
+(define-method (norm (a <vec2>))
+  (sqrt (+ (expt (.x a) 2)
+           (expt (.y a) 2))))
+(export norm)
+
+(define-method (dot (a <vec2>) (b <vec2>))
+  (+ (* (.x a) (.x b))
+     (* (.y a) (.y b))))
+(export dot)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -102,6 +130,18 @@
         (- (* (.z a) (.x b)) (* (.x a) (.z b)))
         (- (* (.x a) (.y b)) (* (.y a) (.x b)))))
 (export cross)
+
+(define-method (norm (a <vec3>))
+  (sqrt (+ (expt (.x a) 2)
+           (expt (.y a) 2)
+           (expt (.z a) 2))))
+(export norm)
+
+(define-method (dot (a <vec3>) (b <vec3>))
+  (+ (* (.x a) (.x b))
+     (* (.y a) (.y b))
+     (* (.z a) (.z b))))
+(export dot)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

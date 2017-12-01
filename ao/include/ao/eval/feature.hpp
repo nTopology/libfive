@@ -1,3 +1,21 @@
+/*
+Ao: a CAD kernel for modeling with implicit functions
+Copyright (C) 2017  Matt Keeter
+
+This library is free software; you can redistribute it and/or
+modify it under the terms of the GNU Lesser General Public
+License as published by the Free Software Foundation; either
+version 2.1 of the License, or (at your option) any later version.
+
+This library is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+Lesser General Public License for more details.
+
+You should have received a copy of the GNU Lesser General Public
+License along with this library; if not, write to the Free Software
+Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+*/
 #pragma once
 
 #include <list>
@@ -27,13 +45,13 @@ public:
      *  This is a slow (worst-case O(n^3)) operation, but it should be called
      *  rarely and so doesn't need to be optimized yet.
      */
-    bool isCompatible(Eigen::Vector3d e) const;
+    bool isCompatible(const Eigen::Vector3d& e) const;
 
     /*
      *  If incompatible, does nothing and returns false
      *  Otherwise, pushes to the front of the choice list and returns true
      */
-    bool push(Eigen::Vector3d e, Choice c={0, 0});
+    bool push(const Eigen::Vector3d& e, Choice c={0, 0});
 
     /*
      *  Accessor method for the choice list
@@ -48,7 +66,7 @@ public:
     /*
      *  Inserts a choice without any checking
      */
-    void pushRaw(Choice c, Eigen::Vector3d v);
+    void pushRaw(Choice c, const Eigen::Vector3d& v);
 
     /*
      *  Inserts a choice without an associated direction
@@ -71,11 +89,11 @@ protected:
     /*
      *  Versions of isCompatible and push when e is known to be normalized
      */
-    bool isCompatibleNorm(Eigen::Vector3d e) const;
-    bool pushNorm(Eigen::Vector3d e, Choice choice);
+    bool isCompatibleNorm(const Eigen::Vector3d& e) const;
+    bool pushNorm(const Eigen::Vector3d& e, Choice choice);
 
     typedef enum { NOT_PLANAR, PLANAR_FAIL, PLANAR_SUCCESS } PlanarResult;
-    PlanarResult checkPlanar(Eigen::Vector3d v) const;
+    PlanarResult checkPlanar(const Eigen::Vector3d& v) const;
 
     /*  Per-clause decisions  */
     std::set<Choice> choices;

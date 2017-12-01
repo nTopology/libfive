@@ -40,16 +40,16 @@ endif()
 target_include_directories(ao-kernel ${TARGET_DIR}
     ${BOOST_INCLUDE_DIR}
     ${PNG_INCLUDE_DIR}
+    ${EIGEN_INCLUDE_DIRS}
 )
 target_include_directories(ao-kernel PUBLIC
     ../include
-    ${EIGEN3_INCLUDE_DIR} # Eigen::Vector3f is used in APIs
 )
 
 set(LIBS ${PNG_LIBRARIES})
 
-if(UNIX)
+if(UNIX AND NOT(APPLE))
     set(LIBS ${LIBS} ${CMAKE_THREAD_LIBS_INIT})
-endif(UNIX)
+endif(UNIX AND NOT(APPLE))
 
 target_link_libraries(ao-kernel ${LIBS})

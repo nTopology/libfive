@@ -1,5 +1,25 @@
-#include <QMouseEvent>
+/*
+Studio: a simple GUI for the Ao CAD kernel
+Copyright (C) 2017  Matt Keeter
 
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 2
+of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+*/
+#include <QMouseEvent>
+#include <QPainter>
+
+#include "gui/color.hpp"
 #include "gui/view.hpp"
 #include "gui/shader.hpp"
 
@@ -23,6 +43,16 @@ View::View(QWidget* parent)
     pick_timer.setSingleShot(true);
     pick_timer.setInterval(250);
     connect(&pick_timer, &QTimer::timeout, this, &View::redrawPicker);
+}
+
+View::~View()
+{
+    makeCurrent();
+    for (auto s : findChildren<Shape*>())
+    {
+        s->freeGL();
+    }
+    doneCurrent();
 }
 
 void View::setShapes(QList<Shape*> new_shapes)
@@ -102,6 +132,10 @@ void View::openSettings()
                 this, &View::onSettingsFromPane);
         pane->show();
         pane->setFixedSize(pane->size());
+        if (!settings_enabled)
+        {
+            pane->disable();
+        }
     }
     else
     {
@@ -143,17 +177,37 @@ void View::onSettingsFromScript(Settings s, bool first)
     }
 }
 
+void View::enableSettings()
+{
+    if (pane)
+    {
+        pane->enable();
+    }
+    settings_enabled = true;
+}
+
+void View::disableSettings()
+{
+    if (pane)
+    {
+        pane->disable();
+    }
+    settings_enabled = false;
+}
+
 void View::initializeGL()
 {
     initializeOpenGLFunctions();
 
     Shader::initializeGL();
 
+    arrow.initializeGL();
     axes.initializeGL();
     background.initializeGL();
     bbox.initializeGL();
     busy.initializeGL();
     bars.initializeGL();
+    ico.initializeGL();
 }
 
 void View::redrawPicker()
@@ -180,7 +234,8 @@ void View::redrawPicker()
 
     glClearColor(0, 0, 0, 1);
     glClearDepthf(1);
-    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+    glClearStencil(0);
+    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
     glViewport(0, 0, camera.size.width(), camera.size.height());
 
@@ -207,9 +262,15 @@ void View::redrawPicker()
 
 void View::paintGL()
 {
+    QPainter painter(this);
+    painter.setRenderHint(QPainter::Antialiasing);
+
+    painter.beginNativePainting();
     background.draw();
 
     auto m = camera.M();
+    glEnable(GL_DEPTH_TEST);
+
     for (auto& s : shapes)
     {
         s->draw(m);
@@ -226,11 +287,35 @@ void View::paintGL()
         bbox.draw(settings.min, settings.max, camera);
     }
 
+    if (drag_target)
+    {
+        arrow.draw(m, cursor_pos, 0.1 / camera.getScale(),
+                   drag_dir, drag_valid ? Color::green : Color::red);
+    }
+
     // This is a no-op if the spinner is hidden
     busy.draw(camera.size);
 
     // Draw hamburger menu
     bars.draw(camera.size);
+    glDisable(GL_DEPTH_TEST);
+    painter.endNativePainting();
+
+    if (cursor_pos_valid)
+    {
+        QFont font = painter.font();
+        font.setFamily("Courier");
+        painter.setFont(font);
+
+        painter.setBrush(Qt::NoBrush);
+        painter.setPen(Color::base1);
+        painter.drawText(QPointF(10, camera.size.height() - 40),
+                         QString("X: %1%2").arg(cursor_pos.x() < 0 ? "" : " ").arg(cursor_pos.x()));
+        painter.drawText(QPointF(10, camera.size.height() - 25),
+                         QString("Y: %1%2").arg(cursor_pos.y() < 0 ? "" : " ").arg(cursor_pos.y()));
+        painter.drawText(QPointF(10, camera.size.height() - 10),
+                         QString("Z: %1%2").arg(cursor_pos.z() < 0 ? "" : " ").arg(cursor_pos.z()));
+    }
 }
 
 void View::resizeGL(int width, int height)
@@ -264,31 +349,33 @@ void View::mouseMoveEvent(QMouseEvent* event)
     }
     else if (mouse.state == mouse.DRAG_EVAL)
     {
-        auto Mi = camera.M().inverted();
-        QVector3D cursor_pos(
-                (event->pos().x() * 2.0) / pick_img.width() - 1,
-                1 - (event->pos().y() * 2.0) / pick_img.height(), 0);
-        QVector3D pos = Mi * cursor_pos;
-        QVector3D ray = (pos - Mi * (cursor_pos + QVector3D(0, 0, 1)))
-            .normalized();
+        // Convert to 3D coordinates, then find the 3D ray that's
+        // represented by the mouse position + viewing angle
+        cursor_pos = toModelPos(event->pos(), 0);
+        auto ray = cursor_pos - toModelPos(event->pos(), 1);
 
         // Slide pos down the ray to minimize distance to drag start
-        pos += ray * QVector3D::dotProduct(drag_start - pos, ray);
+        cursor_pos += ray * QVector3D::dotProduct(drag_start - cursor_pos, ray);
 
         // Solve for the point on the normal ray that is closest to the cursor ray
         // https://en.wikipedia.org/wiki/Skew_lines#Distance_between_two_skew_lines
         const auto n = QVector3D::crossProduct(drag_dir, ray);
         const auto n2 = QVector3D::crossProduct(ray, n);
-        const auto nearest = drag_start +
-            drag_dir * QVector3D::dotProduct(pos - drag_start, n2) /
+        cursor_pos = drag_start +
+            drag_dir * QVector3D::dotProduct(cursor_pos - drag_start, n2) /
             QVector3D::dotProduct(drag_dir, n2);
 
-        auto sol = Kernel::Solver::findRoot(*drag_eval, *drag_target->getVars(),
-                {nearest.x(), nearest.y(), nearest.z()});
+        auto sol = Kernel::Solver::findRoot(*drag_eval, drag_target->getVars(),
+                {cursor_pos.x(), cursor_pos.y(), cursor_pos.z()});
         emit(varsDragged(QMap<Kernel::Tree::Id, float>(sol.second)));
 
-        drag_target->setDragValid(fabs(sol.first) < 1e-6);
-        if (drag_target->updateVars(sol.second))
+        drag_valid = fabs(sol.first) < 1e-6;
+        bool changed = false;
+        for (auto& s : shapes)
+        {
+            changed |= s->updateVars(sol.second);
+        }
+        if (changed)
         {
             busy.show();
         }
@@ -303,6 +390,25 @@ void View::mouseMoveEvent(QMouseEvent* event)
         checkHoverTarget(event->pos());
     }
     mouse.pos = event->pos();
+}
+
+QVector3D View::toModelPos(QPoint pt) const
+{
+    float pick_z = 0;
+    if (pick_img.valid(pt))
+    {
+        pick_z = 2 * pick_depth.at(
+                    pt.x() + pick_img.width() *
+                    (pick_img.height() - pt.y() - 1)) - 1;
+    }
+    return toModelPos(pt, pick_z);
+}
+
+QVector3D View::toModelPos(QPoint pt, float z) const
+{
+    return camera.M().inverted() * QVector3D(
+            (pt.x() * 2.0) / pick_img.width() - 1,
+            1 - (pt.y() * 2.0) / pick_img.height(), z);
 }
 
 void View::mousePressEvent(QMouseEvent* event)
@@ -323,19 +429,12 @@ void View::mousePressEvent(QMouseEvent* event)
             drag_target = picked ? shapes.at(picked - 1) : nullptr;
             if (picked && drag_target->hasVars())
             {
+                this->setCursor(Qt::ClosedHandCursor);
                 emit(dragStart());
                 drag_target->setGrabbed(true);
-                drag_target->setDragValid(true);
+                drag_valid = true;
 
-                QVector3D pt(
-                        (event->pos().x() * 2.0) / pick_img.width() - 1,
-                        1 - (event->pos().y() * 2.0) / pick_img.height(),
-                        2 * pick_depth.at(
-                                event->pos().x() + pick_img.width() *
-                                (pick_img.height() - event->pos().y())) - 1);
-
-                drag_start = camera.M().inverted() * pt;
-
+                drag_start = toModelPos(event->pos());
                 drag_eval.reset(drag_target->dragFrom(drag_start));
 
                 auto norm = drag_eval->deriv(
@@ -346,6 +445,7 @@ void View::mousePressEvent(QMouseEvent* event)
             }
             else
             {
+                drag_target = nullptr;
                 mouse.state = mouse.DRAG_ROT;
             }
         }
@@ -402,6 +502,7 @@ void View::checkHoverTarget(QPoint pos)
         {
             hover_target->setHover(false);
         }
+
         hover_target = target;
         hover_target->setHover(true);
     }
@@ -410,6 +511,16 @@ void View::checkHoverTarget(QPoint pos)
         hover_target->setHover(false);
         hover_target = nullptr;
     }
+
+    bool changed = (cursor_pos_valid != (bool)target);
+    cursor_pos_valid = target;
+    cursor_pos = toModelPos(pos);
+    if (cursor_pos_valid || changed)
+    {
+        update();
+    }
+
+    this->setCursor(hover_target ? Qt::OpenHandCursor : Qt::ArrowCursor);
 }
 
 void View::showAxes(bool a)

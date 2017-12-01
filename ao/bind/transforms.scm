@@ -1,4 +1,22 @@
-(use-modules (ao kernel) (ao vec))
+#|
+Guile bindings to the Ao CAD kernel
+Copyright (C) 2017  Matt Keeter
+
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 2
+of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+|#
+(use-modules (ao kernel) (ao vec) (ao csg))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Translation
@@ -38,7 +56,7 @@
   (remap-shape (shape x y z) x z y))
 
 (define-public (reflect-xz shape)
-  "reflect-xx shape
+  "reflect-xz shape
   Moves the given shape across the plane X=Z"
   (remap-shape (shape x y z) z y x))
 
@@ -141,3 +159,49 @@
       (- x (* base-offset (- 1 f)) (* offset f)))
     y z))
 (export shear-x-y)
+
+(define-public (repel shape locus r)
+  "repel shape #[x0 y0 z0] radius
+  Repels the shape away from a point based upon a radius r"
+  (define (falloff point)
+    (- 1 (exp (- (/ (norm point) r)))))
+  (let ((shapep (move shape (- locus))))
+    (move
+     (remap-shape
+      (shapep x y z)
+      (* x (falloff (vec3 x y z)))
+      (* y (falloff (vec3 x y z)))
+      (* z (falloff (vec3 x y z)))
+      )
+     locus)
+    )
+  )
+
+(define-public (attract shape locus r)
+  "attract shape #[x0 y0 z0] radius
+  Attracts the shape towards a point based upon a radius r"
+  (define (falloff point)
+    (+ 1 (exp (- (/ (norm point) r)))))
+  (let ((shapep (move shape (- locus))))
+    (move
+     (remap-shape
+      (shapep x y z)
+      (* x (falloff (vec3 x y z)))
+      (* y (falloff (vec3 x y z)))
+      (* z (falloff (vec3 x y z)))
+      )
+     locus)
+    )
+  )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define* (revolve-y shape #:optional (x0 0))
+  "revolve-y shape [x0]
+  Revolves a 2D (xy) shape around the vertical line x=x0"
+  (union
+    (remap-shape (shape x y z)
+      (sqrt (+ (square x) (square z))) y z)
+    (remap-shape (shape x y z)
+      (- (sqrt (+ (square x) (square z)))) y z)))
+(export revolve-y)

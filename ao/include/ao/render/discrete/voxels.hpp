@@ -1,3 +1,21 @@
+/*
+Ao: a CAD kernel for modeling with implicit functions
+Copyright (C) 2017  Matt Keeter
+
+This library is free software; you can redistribute it and/or
+modify it under the terms of the GNU Lesser General Public
+License as published by the Free Software Foundation; either
+version 2.1 of the License, or (at your option) any later version.
+
+This library is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+Lesser General Public License for more details.
+
+You should have received a copy of the GNU Lesser General Public
+License along with this library; if not, write to the Free Software
+Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+*/
 #pragma once
 
 #include <Eigen/Eigen>
@@ -22,7 +40,7 @@ public:
      *  expanded about their centers to include a unit number of voxels at the
      *  specified resolution.
      */
-    Voxels(Eigen::Vector3f lower, Eigen::Vector3f upper, float res);
+    Voxels(const Eigen::Vector3f& lower, const Eigen::Vector3f& upper, float res);
 
     /*
      *  Constructs a region with the given bounds and per-axis resolution
@@ -31,7 +49,8 @@ public:
      *  expanded about their centers to include a unit number of voxels at the
      *  specified resolution.
      */
-    Voxels(Eigen::Vector3f lower, Eigen::Vector3f upper, Eigen::Vector3f res);
+    Voxels(const Eigen::Vector3f& lower, const Eigen::Vector3f& upper,
+           const Eigen::Vector3f& res);
 
     /*  Bounding box of the region  */
     Eigen::Vector3f lower, upper;
@@ -126,9 +145,9 @@ public:
         /*
          *  Private constructor, used when subdividing
          */
-        View(Eigen::Vector3f lower, Eigen::Vector3f upper,
-             Eigen::Vector3i size, Eigen::Vector3i corner,
-             Eigen::Matrix<const float*, 3, 1> pts);
+        View(const Eigen::Vector3f& lower, const Eigen::Vector3f& upper,
+             const Eigen::Vector3i& size, const Eigen::Vector3i& corner,
+             const Eigen::Matrix<const float*, 3, 1>& pts);
 
         View();
     };

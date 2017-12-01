@@ -1,3 +1,21 @@
+/*
+Studio: a simple GUI for the Ao CAD kernel
+Copyright (C) 2017  Matt Keeter
+
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 2
+of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+*/
 #include <QActionGroup>
 #include <QDesktopWidget>
 #include <QFileDialog>
@@ -7,6 +25,7 @@
 #include <QMessageBox>
 
 #include "gui/window.hpp"
+#include "gui/documentation.hpp"
 #include "gui/editor.hpp"
 #include "gui/interpreter.hpp"
 #include "gui/view.hpp"
@@ -21,7 +40,7 @@ switch (checkUnsaved())                                         \
     default:    assert(false);                                  \
 }
 
-Window::Window(const QString& target)
+Window::Window(QString target)
     : QMainWindow(), editor(new Editor), view(new View)
 {
     resize(QDesktopWidget().availableGeometry(this).size() * 0.75);
@@ -61,6 +80,16 @@ Window::Window(const QString& target)
     auto open_action = file_menu->addAction("Open...");
     open_action->setShortcut(QKeySequence::Open);
     connect(open_action, &QAction::triggered, this, &Window::onOpen);
+
+    // Add a "Revert to saved" item, which is only enabled if there are
+    // unsaved changes and there's an existing filename to load from.
+    auto revert_action = file_menu->addAction("Revert to saved");
+    connect(revert_action, &QAction::triggered, this, &Window::onRevert);
+    connect(editor, &Editor::modificationChanged,
+            revert_action, [=](bool changed){
+                revert_action->setEnabled(
+                        changed && !this->filename.isEmpty()); });
+    revert_action->setEnabled(false);
 
     file_menu->addSeparator();
 
@@ -128,6 +157,11 @@ Window::Window(const QString& target)
     auto help_menu = menuBar()->addMenu("Help");
     connect(help_menu->addAction("About"), &QAction::triggered,
             this, &Window::onAbout);
+    connect(help_menu->addAction("Load tutorial"), &QAction::triggered,
+            this, &Window::onLoadTutorial);
+    auto ref_action = help_menu->addAction("Shape reference");
+    ref_action->setShortcut(QKeySequence(Qt::CTRL + Qt::Key_Slash));
+    connect(ref_action, &QAction::triggered, this, &Window::onShowDocs);
 
     // Start embedded Guile interpreter
     auto interpreter = new Interpreter();
@@ -138,6 +172,7 @@ Window::Window(const QString& target)
     connect(interpreter, &Interpreter::gotResult, editor, &Editor::onResult);
     connect(interpreter, &Interpreter::gotError, editor, &Editor::onError);
     connect(interpreter, &Interpreter::keywords, editor, &Editor::setKeywords);
+    connect(interpreter, &Interpreter::docs, this, &Window::setDocs);
     connect(interpreter, &Interpreter::gotShapes, view, &View::setShapes);
     connect(interpreter, &Interpreter::gotVars,
             editor, &Editor::setVarPositions);
@@ -147,7 +182,18 @@ Window::Window(const QString& target)
 
     show();
 
-    if (loadFile(target))
+    {   //  Load the tutorial file on first run if there's no target
+        QSettings settings("impraxical", "Studio");
+        if (settings.contains("first-run") &&
+            settings.value("first-run").toBool() &&
+            target.isNull())
+        {
+            target = ":/examples/tutorial.ao";
+        }
+        settings.setValue("first-run", false);
+    }
+
+    if (!target.isEmpty() && loadFile(target))
     {
         setFilename(target);
     }
@@ -174,6 +220,13 @@ void Window::onOpen(bool)
     {
         setFilename(f);
     }
+}
+
+void Window::onRevert(bool)
+{
+    CHECK_UNSAVED();
+    Q_ASSERT(!filename.isEmpty());
+    loadFile(filename);
 }
 
 bool Window::loadFile(QString f)
@@ -349,7 +402,15 @@ QMessageBox::StandardButton Window::checkUnsaved()
 void Window::setFilename(const QString& f)
 {
     filename = f;
-    setWindowFilePath(f);
+    if (filename.startsWith(":/"))
+    {
+        setWindowTitle(QFileInfo(filename).fileName() + " (read-only)");
+    }
+    else
+    {
+        setWindowTitle(QString());
+        setWindowFilePath(f);
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -381,15 +442,28 @@ void Window::onExport(bool)
     }
 
     connect(view, &View::meshesReady, this, &Window::onExportReady);
+    view->disableSettings();
 
     auto p = new QProgressDialog(this);
     p->setCancelButton(nullptr);
     p->setWindowModality(Qt::WindowModal);
     p->setLabelText("Exporting...");
     p->setMaximum(0);
-    connect(this, &Window::exportDone, p, &QProgressDialog::reset);
-    p->show();
 
+    // If we cancel the export (by pressing escape), then we shouldn't
+    // run the final export step (of actually saving the meshes)
+    connect(p, &QProgressDialog::rejected, this, [=](){
+            disconnect(view, &View::meshesReady, this, &Window::onExportReady);
+            this->export_filename = ""; });
+
+    // Delete the progress dialog when we finish or cancel the export
+    connect(this, &Window::exportDone, p, &QProgressDialog::deleteLater);
+    connect(p, &QProgressDialog::rejected, p, &QProgressDialog::deleteLater);
+
+    // When the progress dialog is destroyed, re-enable settings
+    connect(p, &QProgressDialog::destroyed, view, &View::enableSettings);
+
+    p->show();
     view->checkMeshes();
 }
 
@@ -413,4 +487,28 @@ void Window::onAbout(bool)
 #else
     QMessageBox::about(this, "Studio",info);
 #endif
+}
+
+void Window::onLoadTutorial(bool)
+{
+    CHECK_UNSAVED();
+
+    QString target = ":/examples/tutorial.ao";
+    if (loadFile(target))
+    {
+        setFilename(target);
+    }
+}
+
+void Window::setDocs(Documentation* docs)
+{
+    DocumentationPane::setDocs(docs);
+}
+
+void Window::onShowDocs(bool)
+{
+    if (DocumentationPane::hasDocs())
+    {
+        DocumentationPane::open();
+    }
 }

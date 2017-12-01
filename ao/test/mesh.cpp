@@ -1,3 +1,21 @@
+/*
+Ao: a CAD kernel for modeling with implicit functions
+Copyright (C) 2017  Matt Keeter
+
+This library is free software; you can redistribute it and/or
+modify it under the terms of the GNU Lesser General Public
+License as published by the Free Software Foundation; either
+version 2.1 of the License, or (at your option) any later version.
+
+This library is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+Lesser General Public License for more details.
+
+You should have received a copy of the GNU Lesser General Public
+License along with this library; if not, write to the Free Software
+Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+*/
 #include <chrono>
 
 #include "catch.hpp"
@@ -106,6 +124,14 @@ TEST_CASE("Mesh::render (face count in rectangular prism)")
     auto m = Mesh::render(t, Region<3>({-1, -1, -1}, {5, 2, 1.25}), 0.125);
     REQUIRE(m->verts.size() == 9); // index 0 is unused
     REQUIRE(m->branes.size() == 12);
+}
+
+TEST_CASE("Mesh::render (sphere)")
+{
+    auto s = sphere(1);
+    auto m = Mesh::render(s, Region<3>({-1.6, -1, -8}, {1.6, 1, 1}),
+                          1/32.0f, pow(10, -3));
+    REQUIRE(true);
 }
 
 TEST_CASE("Mesh::export (.stl)") {

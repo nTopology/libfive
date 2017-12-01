@@ -1,3 +1,21 @@
+/*
+Studio: a simple GUI for the Ao CAD kernel
+Copyright (C) 2017  Matt Keeter
+
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 2
+of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+*/
 #pragma once
 
 #include <QObject>
@@ -16,8 +34,13 @@ class Shape : public QObject, QOpenGLFunctions
 {
     Q_OBJECT
 public:
-    Shape(Kernel::Tree t, std::shared_ptr<std::map<Kernel::Tree::Id,
-                                                   float>> vars);
+    Shape(Kernel::Tree t, std::map<Kernel::Tree::Id, float> vars);
+
+    /*
+     *  In destructor, wait for computation to finish
+     *  (otherwise XTreeEvaluators may be destroyed early)
+     */
+    ~Shape();
 
     /*  Constructs OpenGL objects as needed  */
     void draw(const QMatrix4x4& M);
@@ -62,13 +85,13 @@ public:
      *
      *  Returns true if variable values have changed.
      */
-    bool updateVars(const std::map<Kernel::Tree::Id, float>& vars);
+    bool updateVars(const std::map<Kernel::Tree::Id, float>& vs);
 
     /*
      *  Checks to see whether this shape has attached vars
      *  (which determines whether it's draggable)
      */
-    bool hasVars() const { return vars->size(); }
+    bool hasVars() const { return vars.size(); }
 
     /*
      *  Returns a new evaluator specialized at the given drag position
@@ -81,13 +104,8 @@ public:
     /*
      *  Returns another pointer to the solution map
      */
-    std::shared_ptr<std::map<Kernel::Tree::Id, float>> getVars() const
+    const std::map<Kernel::Tree::Id, float>& getVars() const
     { return vars; }
-
-    /*
-     *  Sets drag state and redraws as necessary
-     */
-    void setDragValid(bool happy);
 
     /*
      *  Sets grabbed and redraws as necessary
@@ -98,6 +116,15 @@ public:
      *  Sets hover and redraws as necessary
      */
     void setHover(bool h);
+
+    /*
+     *  Destroys all OpenGL objects associated with this shape
+     *
+     *  This must be called when the context is current, and must
+     *  be called before the context is destroyed (otherwise, the Shape
+     *  destructor may try to use a now-destroyed context)
+     */
+    void freeGL();
 
 signals:
     void gotMesh();
@@ -113,7 +140,6 @@ protected:
     void startRender(QPair<Settings, int> s);
 
     bool grabbed=false;
-    bool drag_valid=true;
     bool hover=false;
 
     Kernel::Mesh* renderMesh(QPair<Settings, int> s);
@@ -122,7 +148,7 @@ protected:
     std::atomic_bool cancel;
 
     Kernel::Tree tree;
-    std::shared_ptr<std::map<Kernel::Tree::Id, float>> vars;
+    std::map<Kernel::Tree::Id, float> vars;
     std::vector<Kernel::XTreeEvaluator,
                 Eigen::aligned_allocator<Kernel::XTreeEvaluator>> es;
 

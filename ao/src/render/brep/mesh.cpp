@@ -1,3 +1,21 @@
+/*
+Ao: a CAD kernel for modeling with implicit functions
+Copyright (C) 2017  Matt Keeter
+
+This library is free software; you can redistribute it and/or
+modify it under the terms of the GNU Lesser General Public
+License as published by the Free Software Foundation; either
+version 2.1 of the License, or (at your option) any later version.
+
+This library is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+Lesser General Public License for more details.
+
+You should have received a copy of the GNU Lesser General Public
+License along with this library; if not, write to the Free Software
+Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+*/
 #include <numeric>
 #include <fstream>
 #include <boost/algorithm/string/predicate.hpp>
@@ -147,11 +165,11 @@ std::unique_ptr<Mesh> Mesh::mesh(std::unique_ptr<const XTree<3>> xtree,
     }
 }
 
-void Mesh::line(Eigen::Vector3f a, Eigen::Vector3f b)
+void Mesh::line(const Eigen::Vector3f& a, const Eigen::Vector3f& b)
 {
-    auto a_ = (unsigned)verts.size();
+    uint32_t a_ = verts.size();
     verts.push_back(a);
-    auto b_ = (unsigned)verts.size();
+    uint32_t b_ = verts.size();
     verts.push_back(b);
 
     branes.push_back({a_, a_, b_});

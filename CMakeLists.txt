@@ -45,16 +45,17 @@ add_definitions(-D'GITREV="${GITREV}${GITDIFF}"'
 
 ################################################################################
 # Find all packages here at the top level so we can print debugging info
-find_package(Guile 2.2 QUIET)
-find_package(Qt5Core QUIET)
-
-find_package(Boost QUIET REQUIRED)
+find_package(Qt5Core)
+find_package(Boost REQUIRED)
 find_package(PNG REQUIRED)
-find_package(Eigen3 REQUIRED)
 
-if (UNIX)
-    find_package(Threads REQUIRED QUIET)
-endif(UNIX)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(GUILE REQUIRED guile-2.2)
+pkg_check_modules(EIGEN REQUIRED eigen3)
+
+if (UNIX AND NOT(APPLE))
+    find_package(Threads REQUIRED)
+endif(UNIX AND NOT(APPLE))
 
 ################################################################################
 # Inform the user which subsystems will be built and any missing deps
@@ -63,6 +64,9 @@ message("  libao-kernel: ✓")
 
 if (GUILE_FOUND)
     message("  guile-ao:     ✓")
+
+    # Sadly, this is a global setting (there's no target_link_directories)
+    link_directories(${GUILE_LIBRARY_DIRS})
 else ()
     message("  guile-ao:     ✘   (needs Guile 2.2 or later)")
 endif()

@@ -1,6 +1,27 @@
+/*
+Studio: a simple GUI for the Ao CAD kernel
+Copyright (C) 2017  Matt Keeter
+
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 2
+of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+*/
 #include <QApplication>
 
 #include "gui/interpreter.hpp"
+#include "gui/documentation.hpp"
+#include "gui/shape.hpp"
+
 #include "ao-guile.h"
 
 _Interpreter::_Interpreter()
@@ -48,12 +69,34 @@ port-eof?
         scm_permanent_object(s);
     }
 
+    //  Extract a list of keywords from our list of sandbox-safe symbols
     auto kws = scm_to_locale_string(scm_c_eval_string(R"(
 (string-drop (string-drop-right
     (format #f "~A" (apply append (map cdr sandbox-bindings))) 1) 1)
 )"));
     emit(keywords(kws));
     free(kws);
+
+    // Extract a list of function names + docstrings
+    QList<QString> modules = {"(ao shapes)", "(ao csg)", "(ao transforms)"};
+    Documentation* ds = new Documentation;
+    for (auto mod : modules)
+    {
+        auto f = scm_c_eval_string((R"(
+        (module-map (lambda (sym var)
+            (cons (symbol->string sym)
+                  (procedure-documentation (variable-ref var))))
+          (resolve-interface ')" + mod + "))").toLocal8Bit().constData());
+        for (; !scm_is_null(f); f = scm_cdr(f))
+        {
+            auto name = scm_to_locale_string(scm_caar(f));
+            auto doc = scm_to_locale_string(scm_cdar(f));
+            ds->insert(mod, name, doc);
+            free(name);
+            free(doc);
+        }
+    }
+    emit(docs(ds));
 }
 
 void _Interpreter::eval()
@@ -136,35 +179,33 @@ void _Interpreter::eval()
     if (valid)
     {
         QList<Shape*> shapes;
-        std::shared_ptr<std::map<Kernel::Tree::Id, float>> vars;
+
+        // Initialize variables and their textual positions
+        std::map<Kernel::Tree::Id, float> vars;
         QMap<Kernel::Tree::Id, Editor::Range> var_pos;
+
+        auto vs = scm_c_eval_string(R"(
+            (use-modules (ao sandbox))
+            (hash-map->list (lambda (k v) v) vars) )");
+
+        for (auto v = vs; !scm_is_null(v); v = scm_cdr(v))
+        {
+            auto data = scm_cdar(v);
+            auto id = static_cast<Kernel::Tree::Id>(
+                    ao_tree_id(scm_to_tree(scm_car(data))));
+            auto value = scm_to_double(scm_cadr(data));
+            vars[id] = value;
+
+            auto vp = scm_caddr(data);
+            var_pos[id] = {scm_to_int(scm_car(vp)), 0,
+                           scm_to_int(scm_cadr(vp)),
+                           scm_to_int(scm_caddr(vp))};
+        }
 
         while (!scm_is_null(result))
         {
             if (scm_is_tree(scm_cdar(result)))
             {
-                if (vars.get() == nullptr)
-                {
-                    vars.reset(new std::map<Kernel::Tree::Id, float>);
-
-                    auto vs = scm_c_eval_string(R"(
-                        (use-modules (ao sandbox))
-                        (hash-map->list (lambda (k v) v) vars) )");
-
-                    for (auto v = vs; !scm_is_null(v); v = scm_cdr(v))
-                    {
-                        auto data = scm_cdar(v);
-                        auto id = static_cast<Kernel::Tree::Id>(
-                                ao_tree_id(scm_to_tree(scm_car(data))));
-                        auto value = scm_to_double(scm_cadr(data));
-                        (*vars)[id] = value;
-
-                        auto vp = scm_caddr(data);
-                        var_pos[id] = {scm_to_int(scm_car(vp)), 0,
-                                       scm_to_int(scm_cadr(vp)),
-                                       scm_to_int(scm_caddr(vp))};
-                    }
-                }
                 auto tree = scm_to_tree(scm_cdar(result));
                 auto shape = new Shape(*tree, vars);
                 shape->moveToThread(QApplication::instance()->thread());
@@ -210,6 +251,8 @@ Interpreter::Interpreter()
             this, &Interpreter::gotError);
     connect(&interpreter, &_Interpreter::keywords,
             this, &Interpreter::keywords);
+    connect(&interpreter, &_Interpreter::docs,
+            this, &Interpreter::docs);
     connect(&interpreter, &_Interpreter::gotShapes,
             this, &Interpreter::gotShapes);
     connect(&interpreter, &_Interpreter::gotVars,

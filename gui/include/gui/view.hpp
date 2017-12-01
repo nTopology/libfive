@@ -1,14 +1,34 @@
+/*
+Studio: a simple GUI for the Ao CAD kernel
+Copyright (C) 2017  Matt Keeter
+
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 2
+of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+*/
 #pragma once
 
 #include <QOpenGLWidget>
 #include <QOpenGLFramebufferObject>
 
+#include "gui/arrow.hpp"
 #include "gui/axes.hpp"
 #include "gui/background.hpp"
 #include "gui/bbox.hpp"
 #include "gui/bars.hpp"
 #include "gui/busy.hpp"
 #include "gui/camera.hpp"
+#include "gui/icosphere.hpp"
 #include "gui/shape.hpp"
 #include "gui/settings.hpp"
 
@@ -25,6 +45,15 @@ public:
      *  This is used when quitting to clean up threads quickly
      */
     void cancelShapes();
+
+    /*
+     *  In the destructor, free the OpenGL data associated with
+     *  all children Shapes (because there could be shapes that
+     *  aren't explicitly stored in the object, which will be freed
+     *  by the QObject destructor, which runs after the OpenGL context
+     *  is gone).
+     */
+    ~View();
 
 public slots:
     void setShapes(QList<Shape*> shapes);
@@ -52,6 +81,13 @@ public slots:
      *  Called when the settings pane is edited
      */
     void onSettingsFromPane(Settings s);
+
+    /*
+     *  Enable and disable settings pane
+     *  (used when exporting)
+     */
+    void disableSettings();
+    void enableSettings();
 
 signals:
     /*
@@ -89,12 +125,26 @@ protected:
     void paintGL() override;
     void resizeGL(int width, int height) override;
 
+    /*
+     *  Converts from mouse event coordinates to model coordinates
+     *  using the z depth from the pick buffer
+     */
+    QVector3D toModelPos(QPoint pt) const;
+
+    /*
+     *  Converts from mouse event coordinates to model coordinates
+     *  using a user-provided z depth
+     */
+    QVector3D toModelPos(QPoint pt, float z) const;
+
     /*  Background items to render  */
+    Arrow arrow;
     Axes axes;
     Background background;
     BBox bbox;
     Busy busy;
     Bars bars;
+    Icosphere ico;
 
     void mouseMoveEvent(QMouseEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
@@ -122,6 +172,7 @@ protected:
 
     QList<Shape*> shapes;
     QPointer<SettingsPane> pane;
+    bool settings_enabled=true;
     Settings settings;
     bool show_axes=true;
     bool show_bbox=false;
@@ -137,5 +188,9 @@ protected:
     QVector3D drag_dir;
     QScopedPointer<Kernel::JacobianEvaluator> drag_eval;
     Shape* drag_target=nullptr;
+    bool drag_valid=false;
     Shape* hover_target=nullptr;
+
+    QVector3D cursor_pos;
+    bool cursor_pos_valid=false;
 };

@@ -1,3 +1,21 @@
+/*
+Ao: a CAD kernel for modeling with implicit functions
+Copyright (C) 2017  Matt Keeter
+
+This library is free software; you can redistribute it and/or
+modify it under the terms of the GNU Lesser General Public
+License as published by the Free Software Foundation; either
+version 2.1 of the License, or (at your option) any later version.
+
+This library is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+Lesser General Public License for more details.
+
+You should have received a copy of the GNU Lesser General Public
+License along with this library; if not, write to the Free Software
+Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+*/
 #pragma once
 
 #include <vector>
@@ -18,8 +36,15 @@ class Tape
 public:
     Tape(const Tree root);
 
-    /*  Returned by evaluator types when pushing  */
-    enum Keep { KEEP_BOTH, KEEP_A, KEEP_B };
+    /*  Returned by evaluator types when pushing
+     *  KEEP_BOTH is returned when that function call could have returned
+     *      KEEP_A or KEEP_B (if the values were different);
+     *  KEEP_ALWAYS is returned when no set of values would return KEEP_A/B
+     *
+     *  This distinction lets us track whether a tape has any selective
+     *  clauses (e.g. min and max) left; when no such clauses exist, then
+     *  pushing can be faster */
+    enum Keep { KEEP_BOTH, KEEP_A, KEEP_B, KEEP_ALWAYS };
 
     /*  Different kind of tape pushes  */
     enum Type { UNKNOWN, INTERVAL, SPECIALIZED, FEATURE };
@@ -63,6 +88,14 @@ protected:
         /*  These bounds are only valid if type == INTERVAL  */
         Interval::I X, Y, Z;
         Type type;
+
+        /*  When dummy = 0, this is a usual tape push.
+         *
+         *  When dummy is >= 1, this is a subtape that doesn't
+         *  contain any min / max nodes, so pushing isn't useful any more;
+         *  instead, we increment dummy on push and decrement on pop (until
+         *  it equals 1, at which point we pop as usual). */
+        unsigned dummy=0;
     };
 
     /*  Tape containing our opcodes in reverse order */

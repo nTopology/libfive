@@ -1,3 +1,21 @@
+/*
+Ao: a CAD kernel for modeling with implicit functions
+Copyright (C) 2017  Matt Keeter
+
+This library is free software; you can redistribute it and/or
+modify it under the terms of the GNU Lesser General Public
+License as published by the Free Software Foundation; either
+version 2.1 of the License, or (at your option) any later version.
+
+This library is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+Lesser General Public License for more details.
+
+You should have received a copy of the GNU Lesser General Public
+License along with this library; if not, write to the Free Software
+Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+*/
 #include <iostream>
 #include <Eigen/Eigen>
 
@@ -365,7 +383,7 @@ void loadCases<3>(VertsToPatches<3>& t)
  *  returning a new vertex (by id)
  */
 template <unsigned N>
-static int rotateVertex(int vert, Eigen::Matrix<double, N, N> rot)
+static int rotateVertex(int vert, const Eigen::Matrix<double, N, N>& rot)
 {
     assert(vert < _verts(N));
 
@@ -390,7 +408,7 @@ static int rotateVertex(int vert, Eigen::Matrix<double, N, N> rot)
  *  returning a new bitmasked set of vertices.
  */
 template <unsigned N>
-static unsigned rotateMask(unsigned mask, Eigen::Matrix<double, N, N> rot)
+static unsigned rotateMask(unsigned mask, const Eigen::Matrix<double, N, N>& rot)
 {
     assert(mask < _pow(2, _verts(N)));
 

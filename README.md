@@ -26,15 +26,25 @@ binding to `libao-kernel`.
 It exposes a high-level API to construct shapes,
 and includes a standard library
 of shapes, transforms, and CSG operations.
-- *Studio* is a GUI application in the style of
+- **Studio** is a GUI application in the style of
 [OpenSCAD](http://www.openscad.org/).
 It wraps `libao-guile` and allows for live-coding of solid models.
 The interface also includes direct modeling,
 where the user can push and pull on the model's surface
 to change variables in the script.
 
-# Building
+# Compiling from source
+The full system (`libao` + `libao-guile` + **Studio**)
+has been successfully compiled on Mac and Linux.
+There's also a third-party fork
+[here](https://github.com/bradrothenberg/ao/tree/win64)
+that builds `libao` on Windows with MSVC.
+
 ## Dependencies
+### Build system
+- [`cmake`](https://cmake.org/)
+- [`pkg-config`](https://www.freedesktop.org/wiki/Software/pkg-config/)
+
 ### Geometry Kernel
 - [Eigen 3.x](http://eigen.tuxfamily.org/index.php?title=Main_Page)
 - [`libpng`](http://www.libpng.org/pub/png/libpng.html)
@@ -53,15 +63,15 @@ make
 Adjust based on your Qt installation path, and consider using [`ninja`](https://ninja-build.org/) for faster builds.
 
 # License
-(c) 2015-2017 Matthew Keeter; all rights reserved.
+(c) 2015-2017 Matthew Keeter
 
-This project will eventually be released under an open-source license,
-something like
-- LGPL for `ao-kernel`,
-- GPL for `guile-ao` and `Studio`
-and an option for commercial licensing.
+Different layers of this project are released under different licenses:
+- `ao-kernel` is released under the LGPL, version 2 or later.
+- `guile-ao` and `Studio` are released under the GPL, version 2 or later.
 
-Stay tuned for further details.
+Contact me to discuss custom development,
+integration,
+or commercial support.
 
 # Using the standalone Guile module
 ```

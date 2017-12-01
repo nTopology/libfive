@@ -1,17 +1,36 @@
+/*
+Ao: a CAD kernel for modeling with implicit functions
+Copyright (C) 2017  Matt Keeter
+
+This library is free software; you can redistribute it and/or
+modify it under the terms of the GNU Lesser General Public
+License as published by the Free Software Foundation; either
+version 2.1 of the License, or (at your option) any later version.
+
+This library is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+Lesser General Public License for more details.
+
+You should have received a copy of the GNU Lesser General Public
+License along with this library; if not, write to the Free Software
+Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+*/
 #include <algorithm>
 
 #include "ao/render/discrete/voxels.hpp"
 
 namespace Kernel {
 
-Voxels::Voxels(Eigen::Vector3f lower, Eigen::Vector3f upper, float res)
+Voxels::Voxels(const Eigen::Vector3f& lower, const Eigen::Vector3f& upper,
+               float res)
     : Voxels(lower, upper, {res, res, res})
 {
     // Nothing to do here
 }
 
-Voxels::Voxels(Eigen::Vector3f _lower, Eigen::Vector3f _upper,
-               Eigen::Vector3f res)
+Voxels::Voxels(const Eigen::Vector3f& _lower, const Eigen::Vector3f& _upper,
+               const Eigen::Vector3f& res)
 {
     Eigen::Array3i size = (res.array() * (_upper - _lower).array()).ceil().max(1).cast<int>();
 
@@ -49,9 +68,9 @@ Voxels::View::View(const Voxels& r)
     // Nothing to do here
 }
 
-Voxels::View::View(Eigen::Vector3f lower, Eigen::Vector3f upper,
-                   Eigen::Vector3i size, Eigen::Vector3i corner,
-                   Eigen::Matrix<const float*, 3, 1> pts)
+Voxels::View::View(const Eigen::Vector3f& lower, const Eigen::Vector3f& upper,
+                   const Eigen::Vector3i& size, const Eigen::Vector3i& corner,
+                   const Eigen::Matrix<const float*, 3, 1>& pts)
     : lower(lower), upper(upper), size(size), corner(corner),
       pts(pts)
 {
