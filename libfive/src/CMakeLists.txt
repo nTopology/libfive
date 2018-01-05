@@ -1,12 +1,9 @@
-<<<<<<< HEAD:ao/src/CMakeLists.txt
 if(MSVC)
     set(LINK_TYPE STATIC)
 else()
     set(LINK_TYPE SHARED)
 endif()
 
-add_library(ao-kernel ${LINK_TYPE}
-=======
 # Add a custom command that produces version.cpp, plus
 # a dummy output that's not actually produced, in order
 # to force version.cmake to always be re-run before the build
@@ -15,8 +12,7 @@ ADD_CUSTOM_COMMAND(
            ${CMAKE_CURRENT_BINARY_DIR}/_version.cpp
     COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_SOURCE_DIR}/version.cmake)
 
-add_library(five SHARED
->>>>>>> 5769d7a7c8001ae60fda86fedcd6aafd3879291d:libfive/src/CMakeLists.txt
+add_library(five ${LINK_TYPE}
     eval/base.cpp
     eval/eval_interval.cpp
     eval/eval_jacobian.cpp
@@ -44,19 +40,9 @@ add_library(five SHARED
     ${CMAKE_CURRENT_BINARY_DIR}/version.cpp
 )
 
-<<<<<<< HEAD:ao/src/CMakeLists.txt
-if(MSVC)
-    set(TARGET_DIR PUBLIC)
-else()
-    set(TARGET_DIR SYSTEM PRIVATE)
-endif()
 
-target_include_directories(ao-kernel ${TARGET_DIR}
-    ${BOOST_INCLUDE_DIR}
-=======
 target_include_directories(five SYSTEM PUBLIC
     ${Boost_INCLUDE_DIRS}
->>>>>>> 5769d7a7c8001ae60fda86fedcd6aafd3879291d:libfive/src/CMakeLists.txt
     ${PNG_INCLUDE_DIR}
     ${EIGEN_INCLUDE_DIRS}
 )

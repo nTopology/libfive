@@ -77,7 +77,7 @@ if(GUILE_FOUND AND Qt5Core_FOUND)
 endif(GUILE_FOUND AND Qt5Core_FOUND)
 
 if(MSVC)
-    target_compile_definitions(ao-kernel PUBLIC
+    target_compile_definitions(five PUBLIC
         D_SCL_SECURE_NO_WARNINGS
         _USE_MATH_DEFINES)
 endif()
