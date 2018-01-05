@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.3)
-project(Ao)
+project(libfive)
 
 set (PKG_CONFIG_EXECUTABLE C:/libs/pkg/bin/pkg-config.exe)
 set (PKG_CONFIG_PATH C:/libs/pkg)
@@ -32,22 +32,6 @@ if(APPLE)
 endif()
 
 ################################################################################
-
-execute_process(COMMAND git log --pretty=format:'%h' -n 1
-                OUTPUT_VARIABLE GITREV)
-execute_process(COMMAND bash -c "git diff --quiet --exit-code || echo +"
-                OUTPUT_VARIABLE GITDIFF)
-execute_process(COMMAND git describe --exact-match --tags
-                OUTPUT_VARIABLE GITTAG
-                ERROR_QUIET)
-execute_process(COMMAND git rev-parse --abbrev-ref HEAD
-                OUTPUT_VARIABLE GITBRANCH)
-
-add_definitions(-D'GITREV="${GITREV}${GITDIFF}"'
-                -D'GITTAG="${GITTAG}"'
-                -D'GITBRANCH="${GITBRANCH}"')
-
-################################################################################
 # Find all packages here at the top level so we can print debugging info
 find_package(Qt5Core)
 find_package(Boost REQUIRED)
@@ -60,15 +44,15 @@ endif(UNIX AND NOT(APPLE))
 ################################################################################
 # Inform the user which subsystems will be built and any missing deps
 message("Checking dependencies:")
-message("  libao-kernel: ✓")
+message("  libfive: ✓")
 
 if (GUILE_FOUND)
-    message("  guile-ao:     ✓")
+    message("  guile-libfive:     ✓")
 
     # Sadly, this is a global setting (there's no target_link_directories)
     link_directories(${GUILE_LIBRARY_DIRS})
 else ()
-    message("  guile-ao:     ✘   (needs Guile 2.2 or later)")
+    message("  guile-libfive:     ✘   (needs Guile 2.2 or later)")
 endif()
 
 if (Qt5Core_FOUND AND GUILE_FOUND)
@@ -86,10 +70,10 @@ endif()
 ################################################################################
 
 # Always build the kernel and test suite
-add_subdirectory(ao)
+add_subdirectory(libfive)
 
 if(GUILE_FOUND AND Qt5Core_FOUND)
-    add_subdirectory(gui)
+    add_subdirectory(studio)
 endif(GUILE_FOUND AND Qt5Core_FOUND)
 
 if(MSVC)
