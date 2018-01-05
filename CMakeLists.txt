@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.3)
 project(Ao)
 
+set (PKG_CONFIG_EXECUTABLE C:/libs/pkg/bin/pkg-config.exe)
+set (PKG_CONFIG_PATH C:/libs/pkg)
+
+
 # Properly distinguish between Apple and upstream Clang
 cmake_policy(SET CMP0025 NEW)
 
@@ -48,10 +52,6 @@ add_definitions(-D'GITREV="${GITREV}${GITDIFF}"'
 find_package(Qt5Core)
 find_package(Boost REQUIRED)
 find_package(PNG REQUIRED)
-
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(GUILE REQUIRED guile-2.2)
-pkg_check_modules(EIGEN REQUIRED eigen3)
 
 if (UNIX AND NOT(APPLE))
     find_package(Threads REQUIRED)

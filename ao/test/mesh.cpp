@@ -147,7 +147,7 @@ TEST_CASE("Mesh::export (.stl)") {
   cube = max(-s, cube);
   Region<3> r({ -2.5, -2.5, -2.5 }, { 2.5, 2.5, 2.5 });
 
-  auto mesh = Mesh::render(cube, r, .1);
+  auto mesh = Mesh::render(cube, r, .5);
 
   Eigen::Matrix3f m;
   m = Eigen::AngleAxisf(float(M_PI / 4), Eigen::Vector3f::UnitY()) *
@@ -158,8 +158,8 @@ TEST_CASE("Mesh::export (.stl)") {
   //       m(1, 0)*Tree::X() + m(1, 1)*Tree::Y() + m(1, 2)*Tree::Z(),
   //       m(2, 0)*Tree::X() + m(2, 1)*Tree::Y() + m(2, 2)*Tree::Z());
 
-  mesh->saveSTL("cubeSphereX.stl");
-  mesh->saveSTL("cubeSphereA.stl",false);
+  mesh->saveSTL("cubeSphereXp5.stl");
+  mesh->saveSTL("cubeSphereAp5.stl",false);
 
   auto cube2 = max(max(
     max(-(Tree::X() + 1.5),
