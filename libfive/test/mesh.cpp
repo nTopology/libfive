@@ -155,7 +155,7 @@ TEST_CASE("Mesh::render (gyroid)")
     sin(Kernel::Tree::Y() / scale) * cos(Kernel::Tree::Z() / scale) +
     sin(Kernel::Tree::Z() / scale) * cos(Kernel::Tree::X() / scale);
 
-  Kernel::Tree gyroid = gyroidSrf + thickness;
+  Kernel::Tree gyroid = shell(gyroidSrf, thickness);
   auto sphere1 = sphere(3.0f, { 0.f,0.f,0.f });
 
 

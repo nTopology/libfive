@@ -58,14 +58,19 @@ Kernel::Tree CSGIntersect(Kernel::Tree tA, Kernel::Tree tB)
   return max(tA, tB);
 }
 
+Kernel::Tree offset(Kernel::Tree t, float r)
+{
+  return t + r;
+}
+
 Kernel::Tree shell(Kernel::Tree t, float r)
 {
-
+  return clearence(t, t, r);
 }
 
 Kernel::Tree clearence(Kernel::Tree tA, Kernel::Tree tB, float r)
 {
-
+  return CSGSubtract(tA, offset(tB, r));
 }
 
 Tree recurse(float x, float y, float scale, Eigen::Matrix4f M, int i)

@@ -42,6 +42,9 @@ Kernel::Tree CSGSubtract(Kernel::Tree tA, Kernel::Tree tB);
 Kernel::Tree CSGIntersect(Kernel::Tree tA, Kernel::Tree tB);
 
 
+//Offset: expand or contract t by r
+Kernel::Tree offset(Kernel::Tree t, float r);
+
 //Shell: returns the shell of a given tree w/ a given offset
 //shell t by r
 Kernel::Tree shell(Kernel::Tree t, float r);
