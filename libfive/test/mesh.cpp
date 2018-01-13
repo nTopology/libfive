@@ -116,6 +116,133 @@ TEST_CASE("Mesh::render (performance)")
     WARN(log);
 }
 
+TEST_CASE("Mesh::render (gyroid)")
+{
+
+  //   float scale = 5.f, radius = (10.f / 3.f) * scale, radiusSq = radius * radius, size = radius * 1.1f, minFeat = radius / 40.f;
+  //   Kernel::Region<3> region({ -size, -size, -size }, { size, size, size });
+  //   Kernel::Tree box = max(max(max(max(max(Kernel::Tree::X() - radius, -Kernel::Tree::X() - radius),
+  //                          Kernel::Tree::Y() - radius), -Kernel::Tree::Y() - radius),
+  //                          Kernel::Tree::Z() - radius), -Kernel::Tree::Z() - radius);
+  //   Kernel::Tree schwarz = cos(Kernel::Tree::X() / scale) + cos(Kernel::Tree::Y() / scale) + cos(Kernel::Tree::Z() / scale);
+  //   Kernel::Tree boxschwarz = max(box, schwarz);
+  //   Kernel::Tree gyroid =
+  //     sin(Kernel::Tree::X() / scale) * cos(Kernel::Tree::Y() / scale) +
+  //     sin(Kernel::Tree::Y() / scale) * cos(Kernel::Tree::Z() / scale) +
+  //     sin(Kernel::Tree::Z() / scale) * cos(Kernel::Tree::X() / scale);
+  //   Kernel::Tree boxgyroid = max(box, gyroid);
+  //   Kernel::Tree sphere = -1.21 * radiusSq +
+  //     Kernel::Tree::X() * Kernel::Tree::X() +
+  //     Kernel::Tree::Y() * Kernel::Tree::Y() +
+  //     Kernel::Tree::Z() * Kernel::Tree::Z();
+  //   Kernel::Tree boxsphere = max(box, -sphere);
+  // 
+  //    auto mesh = Kernel::Mesh::render(boxgyroid, region, minFeat, 0.000001);
+
+
+
+  //Brad
+  std::chrono::time_point<std::chrono::system_clock> start, end;
+  std::chrono::duration<double> elapsed;
+
+
+  auto scale = .125f;
+  auto radius = 1.5f;
+
+  Kernel::Tree gyroid =
+    sin(Kernel::Tree::X() / scale) * cos(Kernel::Tree::Y() / scale) +
+    sin(Kernel::Tree::Y() / scale) * cos(Kernel::Tree::Z() / scale) +
+    sin(Kernel::Tree::Z() / scale) * cos(Kernel::Tree::X() / scale);
+
+  auto sphere1 = sphere(3.0f, { 0.f,0.f,0.f });
+
+
+  Kernel::Tree boxschwarz = max(sphere1, gyroid);
+
+
+  Region<3> r({ -5, -5, -5 }, { 5, 5, 5 });
+
+  // Begin timekeeping
+  start = std::chrono::system_clock::now();
+  auto mesh = Mesh::render(boxschwarz, r, 0.05);
+  end = std::chrono::system_clock::now();
+
+  elapsed = end - start;
+
+  auto elapsed_ms =
+    std::chrono::duration_cast<std::chrono::milliseconds>(elapsed);
+
+  std::string log = "\nMade gyroid in " +
+    std::to_string(elapsed.count()) + " sec";
+  WARN(log);
+
+  mesh->saveSTL("gyroidBlnX.stl");
+
+}
+
+TEST_CASE("Mesh::render (schwartz)")
+{
+
+//   float scale = 5.f, radius = (10.f / 3.f) * scale, radiusSq = radius * radius, size = radius * 1.1f, minFeat = radius / 40.f;
+//   Kernel::Region<3> region({ -size, -size, -size }, { size, size, size });
+//   Kernel::Tree box = max(max(max(max(max(Kernel::Tree::X() - radius, -Kernel::Tree::X() - radius),
+//                          Kernel::Tree::Y() - radius), -Kernel::Tree::Y() - radius),
+//                          Kernel::Tree::Z() - radius), -Kernel::Tree::Z() - radius);
+//   Kernel::Tree schwarz = cos(Kernel::Tree::X() / scale) + cos(Kernel::Tree::Y() / scale) + cos(Kernel::Tree::Z() / scale);
+//   Kernel::Tree boxschwarz = max(box, schwarz);
+//   Kernel::Tree gyroid =
+//     sin(Kernel::Tree::X() / scale) * cos(Kernel::Tree::Y() / scale) +
+//     sin(Kernel::Tree::Y() / scale) * cos(Kernel::Tree::Z() / scale) +
+//     sin(Kernel::Tree::Z() / scale) * cos(Kernel::Tree::X() / scale);
+//   Kernel::Tree boxgyroid = max(box, gyroid);
+//   Kernel::Tree sphere = -1.21 * radiusSq +
+//     Kernel::Tree::X() * Kernel::Tree::X() +
+//     Kernel::Tree::Y() * Kernel::Tree::Y() +
+//     Kernel::Tree::Z() * Kernel::Tree::Z();
+//   Kernel::Tree boxsphere = max(box, -sphere);
+// 
+//    auto mesh = Kernel::Mesh::render(boxgyroid, region, minFeat, 0.000001);
+
+  
+
+  //Brad
+  std::chrono::time_point<std::chrono::system_clock> start, end;
+  std::chrono::duration<double> elapsed;
+
+
+ auto scale = .125f;
+ auto radius = 1.5f;
+
+ 
+ auto sphere1 = sphere(3.0f, { 0.f,0.f,0.f });
+
+ Kernel::Tree box = max(max(max(max(max(Kernel::Tree::X() - radius, -Kernel::Tree::X() - radius),
+                        Kernel::Tree::Y() - radius), -Kernel::Tree::Y() - radius),
+                        Kernel::Tree::Z() - radius), -Kernel::Tree::Z() - radius);
+ Kernel::Tree schwarz = cos(Kernel::Tree::X() / scale) + cos(Kernel::Tree::Y() / scale) + cos(Kernel::Tree::Z() / scale);
+ Kernel::Tree boxschwarz = max(sphere1, schwarz);
+
+
+ Region<3> r({ -5, -5, -5 }, { 5, 5, 5 });
+ 
+ // Begin timekeeping
+  start = std::chrono::system_clock::now();
+ auto mesh = Mesh::render(boxschwarz, r, 0.05);
+  end = std::chrono::system_clock::now();
+ 
+  elapsed = end - start;
+ 
+ auto elapsed_ms =
+ std::chrono::duration_cast<std::chrono::milliseconds>(elapsed);
+ 
+ std::string log = "\nMade schwartz in " +
+ std::to_string(elapsed.count()) + " sec";
+ WARN(log);
+ 
+ mesh->saveSTL("schwartzBlnX.stl");
+
+}
+
 TEST_CASE("Mesh::render (face count in rectangular prism)")
 {
     auto t = max(max(max(-Tree::X(), Tree::X() - 4),
