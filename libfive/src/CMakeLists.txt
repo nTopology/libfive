@@ -5,11 +5,12 @@ else()
 endif()
 
 # Add a custom command that produces version.cpp, plus
+
 # a dummy output that's not actually produced, in order
 # to force version.cmake to always be re-run before the build
 ADD_CUSTOM_COMMAND(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/version.cpp
-           ${CMAKE_CURRENT_BINARY_DIR}/_version.cpp
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/version.c
+           ${CMAKE_CURRENT_BINARY_DIR}/_version.c
     COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_SOURCE_DIR}/version.cmake)
 
 add_library(five ${LINK_TYPE}
@@ -37,7 +38,7 @@ add_library(five ${LINK_TYPE}
     tree/tree.cpp
     libfive.cpp
 
-    ${CMAKE_CURRENT_BINARY_DIR}/version.cpp
+    ${CMAKE_CURRENT_BINARY_DIR}/version.c
 )
 
 
