@@ -146,9 +146,9 @@ TEST_CASE("Mesh::render (gyroid)")
   std::chrono::duration<double> elapsed;
 
 
-  auto scale = .25f;
+  auto scale = .5f;
   auto radius = 1.5f;
-  auto thickness = .05;
+  auto thickness = .25;
 
   Kernel::Tree gyroidSrf =
     sin(Kernel::Tree::X() / scale) * cos(Kernel::Tree::Y() / scale) +
@@ -159,7 +159,7 @@ TEST_CASE("Mesh::render (gyroid)")
   auto sphere1 = sphere(3.0f, { 0.f,0.f,0.f });
 
 
-  Kernel::Tree boxGyroid = max(gyroid,sphere1);
+  Kernel::Tree boxGyroid = max(sphere1,gyroid);
 
 
   Region<3> r({ -5, -5, -5 }, { 5, 5, 5 });
