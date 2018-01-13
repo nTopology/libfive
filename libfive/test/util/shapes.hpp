@@ -56,5 +56,9 @@ Kernel::Tree clearence(Kernel::Tree tA, Kernel::Tree tB, float r);
 //blend: blends tA with tB by r
 Kernel::Tree blend(Kernel::Tree tA, Kernel::Tree tB, float r);
 
+//loft: creates a surface between tA & tB in the z-Axis from zMin to zMax
+Kernel::Tree loft(Kernel::Tree tA, Kernel::Tree tB, float zMin, float zMax);
+
+
 //Transforms
 //Scale, Rotate, Move, Shear etc...

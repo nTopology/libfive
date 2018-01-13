@@ -116,6 +116,32 @@ TEST_CASE("Mesh::render (performance)")
     WARN(log);
 }
 
+TEST_CASE("Mesh::generate (loft)")
+{
+  std::chrono::time_point<std::chrono::system_clock> start, end;
+  std::chrono::duration<double> elapsed;
+
+  auto circ1 = circle(1.f);
+  auto rect1 = rectangle(-5.f,5.f,-5.f,5.f);
+
+  auto loftCircs = loft(circ1, rect1, -2.f, 4.f);
+  Region<3> r({ -5, -5, -5 }, { 5, 5, 5 });
+
+  start = std::chrono::system_clock::now();
+  auto mesh = Mesh::render(loftCircs, r, 0.025);
+  end = std::chrono::system_clock::now();
+  elapsed = end - start;
+
+  auto elapsed_ms =
+    std::chrono::duration_cast<std::chrono::milliseconds>(elapsed);
+
+  std::string log = "\nMade lofted circles in " +
+    std::to_string(elapsed.count()) + " sec";
+  WARN(log);
+
+  mesh->saveSTL("loftOut.stl");
+}
+
 TEST_CASE("Mesh::generate (blend)")
 {
   std::chrono::time_point<std::chrono::system_clock> start, end;
@@ -124,11 +150,11 @@ TEST_CASE("Mesh::generate (blend)")
   float blendAmt = .5f;
 
   Kernel::Tree blendSpheres = blend(
-                                    blend(sphere(1.f, { 0.f, -1.f, -1.f }),
-                                          sphere(1.f, { 0.f, 1.f, -1.f }), blendAmt),
-                                    blend(sphere(1.f, { 0.f, -1.f,1.f }),
-                                          sphere(1.f, { 0.f, 1.f, 1.f }), blendAmt),
-                                    blendAmt);
+    blend(box({ 0.f, -2.f, -2.f }, { 0.f, 0.f, 0.f }),
+    sphere(1.f, { 0.f, 1.f, -1.f }), blendAmt),
+    blend(sphere(1.f, { 0.f, -1.f,1.f }),
+    sphere(1.f, { 0.f, 1.f, 1.f }), blendAmt),
+    blendAmt);
 
   //auto r = findBounds(blendSpheres);
   Region<3> r({ -5, -5, -5 }, { 5, 5, 5 });

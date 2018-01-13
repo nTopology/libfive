@@ -79,6 +79,15 @@ Kernel::Tree blend(Kernel::Tree tA, Kernel::Tree tB, float r)
                   CSGUnion(tB, (sqrt(abs(tA)) + sqrt(abs(tB))) - r));
 }
 
+Kernel::Tree loft(Kernel::Tree tA, Kernel::Tree tB, float zMin, float zMax)
+{
+  return max(max((Tree::Z() - zMax), 
+                 (zMin - Tree::Z())),
+             (((Tree::Z() - zMin)*tB) + 
+             ((zMax - Tree::Z())*tA)) 
+             / (zMax - zMin));
+}
+
 Tree recurse(float x, float y, float scale, Eigen::Matrix4f M, int i)
 {
     auto base = rectangle(x - scale/2, x + scale/2,
