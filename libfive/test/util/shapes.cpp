@@ -43,6 +43,31 @@ Tree move(Tree t, Eigen::Vector3f m)
     return t.remap(Tree::X() - m.x(), Tree::Y() - m.y(), Tree::Z() - m.z());
 }
 
+Kernel::Tree CSGUnion(Kernel::Tree tA, Kernel::Tree tB)
+{
+ return min(tA, tB);
+}
+
+Kernel::Tree CSGSubtract(Kernel::Tree tA, Kernel::Tree tB)
+{
+  return CSGIntersect(tA, -tB);
+}
+
+Kernel::Tree CSGIntersect(Kernel::Tree tA, Kernel::Tree tB)
+{
+  return max(tA, tB);
+}
+
+Kernel::Tree shell(Kernel::Tree t, float r)
+{
+
+}
+
+Kernel::Tree clearence(Kernel::Tree tA, Kernel::Tree tB, float r)
+{
+
+}
+
 Tree recurse(float x, float y, float scale, Eigen::Matrix4f M, int i)
 {
     auto base = rectangle(x - scale/2, x + scale/2,

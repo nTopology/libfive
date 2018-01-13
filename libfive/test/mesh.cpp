@@ -146,25 +146,27 @@ TEST_CASE("Mesh::render (gyroid)")
   std::chrono::duration<double> elapsed;
 
 
-  auto scale = .125f;
+  auto scale = .25f;
   auto radius = 1.5f;
+  auto thickness = .05;
 
-  Kernel::Tree gyroid =
+  Kernel::Tree gyroidSrf =
     sin(Kernel::Tree::X() / scale) * cos(Kernel::Tree::Y() / scale) +
     sin(Kernel::Tree::Y() / scale) * cos(Kernel::Tree::Z() / scale) +
     sin(Kernel::Tree::Z() / scale) * cos(Kernel::Tree::X() / scale);
 
+  Kernel::Tree gyroid = gyroidSrf + thickness;
   auto sphere1 = sphere(3.0f, { 0.f,0.f,0.f });
 
 
-  Kernel::Tree boxschwarz = max(sphere1, gyroid);
+  Kernel::Tree boxGyroid = max(gyroid,sphere1);
 
 
   Region<3> r({ -5, -5, -5 }, { 5, 5, 5 });
 
   // Begin timekeeping
   start = std::chrono::system_clock::now();
-  auto mesh = Mesh::render(boxschwarz, r, 0.05);
+  auto mesh = Mesh::render(boxGyroid, r, 0.025);
   end = std::chrono::system_clock::now();
 
   elapsed = end - start;
@@ -176,7 +178,7 @@ TEST_CASE("Mesh::render (gyroid)")
     std::to_string(elapsed.count()) + " sec";
   WARN(log);
 
-  mesh->saveSTL("gyroidBlnX.stl");
+  mesh->saveSTL("gyroidBlnXThick.stl");
 
 }
 

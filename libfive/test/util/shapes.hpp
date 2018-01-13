@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "libfive/tree/tree.hpp"
 
+//Shapes:
 Kernel::Tree rectangle(float xmin, float xmax, float ymin, float ymax,
                        Eigen::Matrix4f M=Eigen::Matrix4f::Identity());
 Kernel::Tree menger(int i);
@@ -33,3 +34,21 @@ Kernel::Tree CylinderYAxis(Eigen::Vector3f start, float r);
 
 Kernel::Tree rotate2d(Kernel::Tree t, float angle);
 Kernel::Tree move(Kernel::Tree t, Eigen::Vector3f d);
+
+
+//CSG:
+Kernel::Tree CSGUnion(Kernel::Tree tA, Kernel::Tree tB);
+Kernel::Tree CSGSubtract(Kernel::Tree tA, Kernel::Tree tB);
+Kernel::Tree CSGIntersect(Kernel::Tree tA, Kernel::Tree tB);
+
+
+//Shell: returns the shell of a given tree w/ a given offset
+//shell t by r
+Kernel::Tree shell(Kernel::Tree t, float r);
+
+//clearence: make sure A clears B by amount R
+//Expands Tb by r & then subtracts it from A 
+Kernel::Tree clearence(Kernel::Tree tA, Kernel::Tree tB, float r);
+
+//Transforms
+//Scale, Rotate, Move, Shear etc...
