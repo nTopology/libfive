@@ -37,13 +37,31 @@ Region<3> findBounds(const Tree& t, const std::map<Tree::Id, float>& vars)
 
 Region<3> findBounds(IntervalEvaluator* eval)
 {
-    const auto inf = std::numeric_limits<double>::infinity();
-    Region<3> out({-inf, -inf, -inf}, {inf, inf, inf});
+  const auto inf = std::numeric_limits<double>::infinity();
+  Region<3> out({ -inf, -inf, -inf }, { inf, inf, inf });
+
+      // Helper function to load and evaluate an interval
+    auto testRegion = [=](const Region<3>& r){
+
+      float l0 =(float) r.lower(0);
+      float l1 =(float) r.lower(1);
+      float l2 =(float) r.lower(2);
+
+      float u0 =(float) r.upper(0);
+      float u1 =(float) r.upper(1);
+      float u2 =(float) r.upper(2);
+
+      return eval->eval({l0,l1,l2},
+                        {u0,u1,u2}).lower();
+    };
+ /*
+
 
     // Helper function to load and evaluate an interval
     auto testRegion = [=](const Region<3>& r){
         return eval->eval(r.lower.template cast<float>(),
                           r.upper.template cast<float>()).lower(); };
+*/
 
     // Helper function to check a particular [axis + sign + value].
     //
@@ -157,6 +175,7 @@ Region<3> findBounds(IntervalEvaluator* eval)
         }
         out = next;
     }
+
     return out;
 }
 

@@ -15,10 +15,10 @@ set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 
 if(MSVC)
     set(CMAKE_CXX_FLAGS "-Wall -bigobj ")
-    set(CMAKE_CXX_FLAGS_RELEASE  "-O3 -DRELEASE -DEIGEN_NO_DEBUG")
+    set(CMAKE_CXX_FLAGS_RELEASE  "-DRELEASE -DEIGEN_NO_DEBUG")
 else()
     set(CMAKE_CXX_FLAGS "-Wall -Wextra -g -fPIC -pedantic -Werror=switch -march=native")
-    set(CMAKE_CXX_FLAGS_RELEASE  "-O3 -DRELEASE -DEIGEN_NO_DEBUG")
+    set(CMAKE_CXX_FLAGS_RELEASE  "-DRELEASE -DEIGEN_NO_DEBUG")
     set(CMAKE_CXX_FLAGS_DEBUG    "-O0")
 endif()
 
