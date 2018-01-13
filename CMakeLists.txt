@@ -37,6 +37,12 @@ find_package(Qt5Core)
 find_package(Boost REQUIRED)
 find_package(PNG REQUIRED)
 
+if(APPLE)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(GUILE guile-2.2)
+    pkg_check_modules(EIGEN REQUIRED eigen3)
+endif(APPLE)
+
 if (UNIX AND NOT(APPLE))
     find_package(Threads REQUIRED)
 endif(UNIX AND NOT(APPLE))
@@ -47,12 +53,12 @@ message("Checking dependencies:")
 message("  libfive: ✓")
 
 if (GUILE_FOUND)
-    message("  guile-libfive:     ✓")
+    message("  libfive-guile:     ✓")
 
     # Sadly, this is a global setting (there's no target_link_directories)
     link_directories(${GUILE_LIBRARY_DIRS})
 else ()
-    message("  guile-libfive:     ✘   (needs Guile 2.2 or later)")
+    message("  libfive-guile:     ✘   (needs Guile 2.2 or later)")
 endif()
 
 if (Qt5Core_FOUND AND GUILE_FOUND)

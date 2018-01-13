@@ -27,7 +27,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 View::View(QWidget* parent)
     : QOpenGLWidget(parent), camera(size()),
-      settings({-10, -10, -10}, {10, 10, 10}, 10, 8)
+      settings(Settings::defaultSettings())
 {
     setMouseTracking(true);
 
@@ -284,7 +284,27 @@ void View::paintGL()
 
     if (show_bbox)
     {
-        bbox.draw(settings.min, settings.max, camera);
+        // This is intentionally accidentally quadratic, as we won't
+        // be drawing too many bounding boxes and QVector3D doesn't
+        // come with operator< or qHash overloads.
+        QList<QPair<QVector3D, QVector3D>> shown;
+        auto draw_bbox = [&](QVector3D min, QVector3D max){
+            if (!shown.contains({min, max}))
+            {
+                bbox.draw(min, max, camera);
+                shown.push_back({min, max});
+            }
+        };
+        for (auto& s : shapes)
+        {
+            auto b = s->getBounds();
+            draw_bbox(QVector3D(b.lower.x(), b.lower.y(), b.lower.z()),
+                      QVector3D(b.upper.x(), b.upper.y(), b.upper.z()));
+        }
+        if (shapes.size() == 0)
+        {
+            draw_bbox(settings.min, settings.max);
+        }
     }
 
     if (drag_target)
@@ -494,7 +514,7 @@ void View::checkHoverTarget(QPoint pos)
 {
     syncPicker();
 
-    auto picked = (pick_img.pixel(pos) & 0xFFFFFF);
+    auto picked = pick_img.valid(pos) ? (pick_img.pixel(pos) & 0xFFFFFF) : 0;
     auto target = picked ? shapes.at(picked - 1) : nullptr;
     if (target && target->hasVars())
     {
