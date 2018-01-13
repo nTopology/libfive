@@ -73,6 +73,12 @@ Kernel::Tree clearence(Kernel::Tree tA, Kernel::Tree tB, float r)
   return CSGSubtract(tA, offset(tB, r));
 }
 
+Kernel::Tree blend(Kernel::Tree tA, Kernel::Tree tB, float r)
+{
+  return CSGUnion(tA, 
+                  CSGUnion(tB, (sqrt(abs(tA)) + sqrt(abs(tB))) - r));
+}
+
 Tree recurse(float x, float y, float scale, Eigen::Matrix4f M, int i)
 {
     auto base = rectangle(x - scale/2, x + scale/2,

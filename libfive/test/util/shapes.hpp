@@ -53,5 +53,8 @@ Kernel::Tree shell(Kernel::Tree t, float r);
 //Expands Tb by r & then subtracts it from A 
 Kernel::Tree clearence(Kernel::Tree tA, Kernel::Tree tB, float r);
 
+//blend: blends tA with tB by r
+Kernel::Tree blend(Kernel::Tree tA, Kernel::Tree tB, float r);
+
 //Transforms
 //Scale, Rotate, Move, Shear etc...
