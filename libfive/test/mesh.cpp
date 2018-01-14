@@ -182,7 +182,7 @@ TEST_CASE("Mesh::generate (gradient blend)")
   float blendAmt = .25f;
 
   auto boxB = box({ -2,-2,0 }, { 2,2,1 });
-  auto sphereB = sphere(1.f);
+  auto sphereB = sphere(2.f, {2.f,2.f,0.f});
 
   auto blendObj = CSGUnionRound(boxB, sphereB, blendAmt);
 
@@ -197,7 +197,7 @@ TEST_CASE("Mesh::generate (gradient blend)")
   auto elapsed_ms =
     std::chrono::duration_cast<std::chrono::milliseconds>(elapsed);
 
-  std::string log = "\nMade blended spheres in " +
+  std::string log = "\nMade gradient blended spheres in " +
     std::to_string(elapsed.count()) + " sec";
   WARN(log);
 
