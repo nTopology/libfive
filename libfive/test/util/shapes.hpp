@@ -41,6 +41,7 @@ Kernel::Tree CSGUnion(Kernel::Tree tA, Kernel::Tree tB);
 Kernel::Tree CSGSubtract(Kernel::Tree tA, Kernel::Tree tB);
 Kernel::Tree CSGIntersect(Kernel::Tree tA, Kernel::Tree tB);
 
+Kernel::Tree CSGUnionRound(Kernel::Tree tA, Kernel::Tree tB, float r);
 
 //Offset: expand or contract t by r
 Kernel::Tree offset(Kernel::Tree t, float r);

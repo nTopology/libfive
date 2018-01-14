@@ -174,6 +174,36 @@ TEST_CASE("Mesh::generate (blend)")
   mesh->saveSTL("blendSpheres.stl");
 }
 
+TEST_CASE("Mesh::generate (gradient blend)")
+{
+  std::chrono::time_point<std::chrono::system_clock> start, end;
+  std::chrono::duration<double> elapsed;
+
+  float blendAmt = .25f;
+
+  auto boxB = box({ -2,-2,0 }, { 2,2,1 });
+  auto sphereB = sphere(1.f);
+
+  auto blendObj = CSGUnionRound(boxB, sphereB, blendAmt);
+
+  //auto r = findBounds(blendSpheres);
+  Region<3> r({ -5, -5, -5 }, { 5, 5, 5 });
+
+  start = std::chrono::system_clock::now();
+  auto mesh = Mesh::render(blendObj, r, 0.05);
+  end = std::chrono::system_clock::now();
+  elapsed = end - start;
+
+  auto elapsed_ms =
+    std::chrono::duration_cast<std::chrono::milliseconds>(elapsed);
+
+  std::string log = "\nMade blended spheres in " +
+    std::to_string(elapsed.count()) + " sec";
+  WARN(log);
+
+  mesh->saveSTL("blendGradSpheres.stl");
+}
+
 TEST_CASE("Mesh::generate (gyroid)")
 {
   std::chrono::time_point<std::chrono::system_clock> start, end;

@@ -58,6 +58,25 @@ Kernel::Tree CSGIntersect(Kernel::Tree tA, Kernel::Tree tB)
   return max(tA, tB);
 }
 
+Kernel::Tree CSGUnionRound(Kernel::Tree tA, Kernel::Tree tB, float r)
+{
+  auto vc0 = r - tA;
+  auto vc1 = r - tB;
+
+  auto u0 = max(vc0, 0.f);
+  auto u1 = max(vc1, 0.f);
+   
+  auto len = sqrt(square(u0) + square(u1));
+
+  return max(r, min(tA, tB)) - len;
+//   // The "Round" variant uses a quarter-circle to join the two objects smoothly:
+//   float fOpUnionRound(float a, float b, float r)
+//   {
+//     vec2 u = max(vec2(r - a, r - b), vec2(0));
+//     return max(r, min(a, b)) - length(u);
+//   }
+}
+
 Kernel::Tree offset(Kernel::Tree t, float r)
 {
   return t + r;
