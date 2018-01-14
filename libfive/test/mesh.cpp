@@ -179,7 +179,7 @@ TEST_CASE("Mesh::generate (gradient blend)")
   std::chrono::time_point<std::chrono::system_clock> start, end;
   std::chrono::duration<double> elapsed;
 
-  float blendAmt = .5f;
+  float blendAmt = .125f;
 
   auto boxB = box({ -2,-2,0 }, { 2,2,1 });
   auto sphereB = sphere(2.f, {2.f,2.f,0.f});
@@ -190,18 +190,36 @@ TEST_CASE("Mesh::generate (gradient blend)")
   Region<3> r({ -5, -5, -5 }, { 5, 5, 5 });
 
   start = std::chrono::system_clock::now();
-  auto mesh = Mesh::render(blendObj, r, 0.05);
+  auto mesh = Mesh::render(blendObj, r, 0.025);
   end = std::chrono::system_clock::now();
   elapsed = end - start;
 
   auto elapsed_ms =
     std::chrono::duration_cast<std::chrono::milliseconds>(elapsed);
 
-  std::string log = "\nMade gradient blended spheres in " +
+  std::string log = "\nMade gradient blended_Rnd spheres in " +
     std::to_string(elapsed.count()) + " sec";
   WARN(log);
 
-  mesh->saveSTL("blendGradSpheres.stl");
+  mesh->saveSTL("blendGradSpheres_rnd.stl");
+
+  //chamfer:
+
+  auto blendChObj = CSGUnionChamfer(boxB, sphereB, blendAmt);
+
+  start = std::chrono::system_clock::now();
+  auto meshChamf = Mesh::render(blendChObj, r, 0.025);
+  end = std::chrono::system_clock::now();
+  elapsed = end - start;
+
+  elapsed_ms =
+    std::chrono::duration_cast<std::chrono::milliseconds>(elapsed);
+
+  log = "\nMade gradient blended_chamf spheres in " +
+    std::to_string(elapsed.count()) + " sec";
+  WARN(log);
+
+  meshChamf->saveSTL("blendGradSpheres_chamf.stl");
 }
 
 TEST_CASE("Mesh::generate (gyroid)")

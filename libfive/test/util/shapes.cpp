@@ -77,6 +77,11 @@ Kernel::Tree CSGUnionRound(Kernel::Tree tA, Kernel::Tree tB, float r)
 //   }
 }
 
+Kernel::Tree CSGUnionChamfer(Kernel::Tree tA, Kernel::Tree tB, float r)
+{
+  return min(min(tA, tB), (tA - r + tB)*sqrt(0.5f));
+}
+
 Kernel::Tree offset(Kernel::Tree t, float r)
 {
   return t + r;
