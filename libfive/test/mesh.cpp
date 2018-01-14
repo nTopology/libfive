@@ -179,7 +179,7 @@ TEST_CASE("Mesh::generate (gradient blend)")
   std::chrono::time_point<std::chrono::system_clock> start, end;
   std::chrono::duration<double> elapsed;
 
-  float blendAmt = .25f;
+  float blendAmt = .5f;
 
   auto boxB = box({ -2,-2,0 }, { 2,2,1 });
   auto sphereB = sphere(2.f, {2.f,2.f,0.f});
