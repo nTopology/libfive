@@ -122,13 +122,15 @@ TEST_CASE("Mesh::generate (loft)")
   std::chrono::duration<double> elapsed;
 
   auto circ1 = circle(1.f);
-  auto rect1 = rectangle(-5.f,5.f,-5.f,5.f);
+  auto rect1 = rectangle(-5.f,0.f,-5.f,0.f);
+  rect1 = move(rect1, { 0.f,0.f,4.f });
 
-  auto loftCircs = loft(circ1, rect1, -2.f, 4.f);
+  //auto loftCircs = loft(circ1, rect1, -2.f, 4.f);
+  auto loftCircs = loftBetween(circ1, rect1, {0.f,0.f, -2.f }, {-2.5,-2.5, 4.f });
   Region<3> r({ -5, -5, -5 }, { 5, 5, 5 });
 
   start = std::chrono::system_clock::now();
-  auto mesh = Mesh::render(loftCircs, r, 0.025);
+  auto mesh = Mesh::render(loftCircs, r, 0.0125);
   end = std::chrono::system_clock::now();
   elapsed = end - start;
 

@@ -22,6 +22,10 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "libfive/tree/tree.hpp"
 
+//Ops:
+
+Kernel::Tree OpMix(Kernel::Tree tA, Kernel::Tree tB, float a);
+
 //Shapes:
 Kernel::Tree rectangle(float xmin, float xmax, float ymin, float ymax,
                        Eigen::Matrix4f M=Eigen::Matrix4f::Identity());
@@ -60,6 +64,10 @@ Kernel::Tree blend(Kernel::Tree tA, Kernel::Tree tB, float r);
 
 //loft: creates a surface between tA & tB in the z-Axis from zMin to zMax
 Kernel::Tree loft(Kernel::Tree tA, Kernel::Tree tB, float zMin, float zMax);
+Kernel::Tree loftBetween(Kernel::Tree tA, 
+                         Kernel::Tree tB, 
+                         const Eigen::Vector3f& lower, 
+                         const Eigen::Vector3f& upper);
 
 
 //Transforms

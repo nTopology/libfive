@@ -22,6 +22,11 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 using namespace Kernel;
 
+Kernel::Tree OpMix(Kernel::Tree tA, Kernel::Tree tB, float a)
+{
+  return tA * (1.0 - a) + tB * a;
+}
+
 Tree rectangle(float xmin, float xmax, float ymin, float ymax,
                Eigen::Matrix4f M)
 {
@@ -110,6 +115,31 @@ Kernel::Tree loft(Kernel::Tree tA, Kernel::Tree tB, float zMin, float zMax)
              (((Tree::Z() - zMin)*tB) + 
              ((zMax - Tree::Z())*tA)) 
              / (zMax - zMin));
+}
+
+Kernel::Tree loftBetween(Kernel::Tree tA, 
+                         Kernel::Tree tB, 
+                         const Eigen::Vector3f& lower, 
+                         const Eigen::Vector3f& upper)
+{
+  auto x = Tree::X();
+  auto y = Tree::Y();
+  auto z = Tree::Z();
+
+  auto fz = (z - lower.z()) / (upper.z() - lower.z());
+
+  auto gz = (upper.z() - z) / (upper.z() - lower.z());
+
+
+  auto rmAx = x + fz * (lower.x() - upper.x());
+  auto rmAy = y + fz * (lower.y() - upper.y());
+  auto a = tA.remap(rmAx, rmAy, z);
+
+  auto rmBx = x + gz * (upper.x() - lower.x());
+  auto rmBy = y + gz * (upper.y() - lower.y());
+  auto b = tB.remap(rmBx, rmBy, z);
+
+  return loft(a, b, lower.z(), upper.z());
 }
 
 Tree recurse(float x, float y, float scale, Eigen::Matrix4f M, int i)
