@@ -77,3 +77,22 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
     (max (- z zmax) (- zmin z)
       (/ (+ (* (- z zmin) b) (* (- zmax z) a))
          (- zmax zmin)))))
+
+
+
+
+
+
+
+
+  (lambda-shape (x y z)
+    (max (- z zmax) (- zmin z)
+      (
+        (
+          ((z - zmin) * b)
+        +
+          ((zmax - z) * a)
+        )
+        /
+         (zmax - zmin))))
+)

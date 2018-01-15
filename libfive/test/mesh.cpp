@@ -22,7 +22,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "libfive/render/brep/mesh.hpp"
 #include "libfive/render/brep/region.hpp"
-
+#include "libfive/solve/bounds.hpp"
 #include "util/shapes.hpp"
 
 using namespace Kernel;
@@ -114,6 +114,193 @@ TEST_CASE("Mesh::render (performance)")
     std::string log = "\nMade sponge mesh in " +
            std::to_string(elapsed.count()) + " sec";
     WARN(log);
+}
+
+TEST_CASE("Mesh::generate (loft)")
+{
+  std::chrono::time_point<std::chrono::system_clock> start, end;
+  std::chrono::duration<double> elapsed;
+
+  auto circ1 = circle(1.f);
+  auto rect1 = rectangle(-5.f,0.f,-5.f,0.f);
+  rect1 = move(rect1, { 0.f,0.f,4.f });
+
+  //auto loftCircs = loft(circ1, rect1, -2.f, 4.f);
+  auto loftCircs = loftBetween(circ1, rect1, {0.f,0.f, -2.f }, {-2.5,-2.5, 4.f });
+  Region<3> r({ -5, -5, -5 }, { 5, 5, 5 });
+
+  start = std::chrono::system_clock::now();
+  auto mesh = Mesh::render(loftCircs, r, 0.0125);
+  end = std::chrono::system_clock::now();
+  elapsed = end - start;
+
+  auto elapsed_ms =
+    std::chrono::duration_cast<std::chrono::milliseconds>(elapsed);
+
+  std::string log = "\nMade lofted circles in " +
+    std::to_string(elapsed.count()) + " sec";
+  WARN(log);
+
+  mesh->saveSTL("loftOut.stl");
+}
+
+TEST_CASE("Mesh::generate (blend)")
+{
+  std::chrono::time_point<std::chrono::system_clock> start, end;
+  std::chrono::duration<double> elapsed;
+
+  float blendAmt = .5f;
+
+  Kernel::Tree blendSpheres = blend(
+    blend(box({ 0.f, -2.f, -2.f }, { 0.f, 0.f, 0.f }),
+    sphere(1.f, { 0.f, 1.f, -1.f }), blendAmt),
+    blend(sphere(1.f, { 0.f, -1.f,1.f }),
+    sphere(1.f, { 0.f, 1.f, 1.f }), blendAmt),
+    blendAmt);
+
+  //auto r = findBounds(blendSpheres);
+  Region<3> r({ -5, -5, -5 }, { 5, 5, 5 });
+
+  start = std::chrono::system_clock::now();
+  auto mesh = Mesh::render(blendSpheres, r, 0.05);
+  end = std::chrono::system_clock::now();
+  elapsed = end - start;
+
+  auto elapsed_ms =
+    std::chrono::duration_cast<std::chrono::milliseconds>(elapsed);
+
+  std::string log = "\nMade blended spheres in " +
+    std::to_string(elapsed.count()) + " sec";
+  WARN(log);
+
+  mesh->saveSTL("blendSpheres.stl");
+}
+
+TEST_CASE("Mesh::generate (gradient blend)")
+{
+  std::chrono::time_point<std::chrono::system_clock> start, end;
+  std::chrono::duration<double> elapsed;
+
+  float blendAmt = .125f;
+
+  auto boxB = box({ -2,-2,0 }, { 2,2,1 });
+  auto sphereB = sphere(2.f, {2.f,2.f,0.f});
+
+  auto blendObj = CSGUnionRound(boxB, sphereB, blendAmt);
+
+  //auto r = findBounds(blendSpheres);
+  Region<3> r({ -5, -5, -5 }, { 5, 5, 5 });
+
+  start = std::chrono::system_clock::now();
+  auto mesh = Mesh::render(blendObj, r, 0.025);
+  end = std::chrono::system_clock::now();
+  elapsed = end - start;
+
+  auto elapsed_ms =
+    std::chrono::duration_cast<std::chrono::milliseconds>(elapsed);
+
+  std::string log = "\nMade gradient blended_Rnd spheres in " +
+    std::to_string(elapsed.count()) + " sec";
+  WARN(log);
+
+  mesh->saveSTL("blendGradSpheres_rnd.stl");
+
+  //chamfer:
+
+  auto blendChObj = CSGUnionChamfer(boxB, sphereB, blendAmt);
+
+  start = std::chrono::system_clock::now();
+  auto meshChamf = Mesh::render(blendChObj, r, 0.025);
+  end = std::chrono::system_clock::now();
+  elapsed = end - start;
+
+  elapsed_ms =
+    std::chrono::duration_cast<std::chrono::milliseconds>(elapsed);
+
+  log = "\nMade gradient blended_chamf spheres in " +
+    std::to_string(elapsed.count()) + " sec";
+  WARN(log);
+
+  meshChamf->saveSTL("blendGradSpheres_chamf.stl");
+}
+
+TEST_CASE("Mesh::generate (gyroid)")
+{
+  std::chrono::time_point<std::chrono::system_clock> start, end;
+  std::chrono::duration<double> elapsed;
+
+  auto scale = .5f;
+  auto radius = 1.5f;
+  auto thickness = .5;
+
+  auto gyroidSrf =
+    sin(Kernel::Tree::X() / scale) * cos(Kernel::Tree::Y() / scale) +
+    sin(Kernel::Tree::Y() / scale) * cos(Kernel::Tree::Z() / scale) +
+    sin(Kernel::Tree::Z() / scale) * cos(Kernel::Tree::X() / scale);
+
+  auto gyroid = shell(gyroidSrf, thickness);
+  auto sphere1 = sphere(3.0f, { 0.f,0.f,0.f });
+
+  auto sphereGyroid = CSGIntersect(sphere1,gyroid);
+  sphereGyroid = blend(sphereGyroid, sphereGyroid, .5);
+
+  Region<3> r({ -5, -5, -5 }, { 5, 5, 5 });
+
+  // Begin timekeeping
+  start = std::chrono::system_clock::now();
+  auto mesh = Mesh::render(sphereGyroid, r, 0.025);
+  end = std::chrono::system_clock::now();
+
+  elapsed = end - start;
+
+  auto elapsed_ms =
+    std::chrono::duration_cast<std::chrono::milliseconds>(elapsed);
+
+  std::string log = "\nMade gyroid in " +
+    std::to_string(elapsed.count()) + " sec";
+  WARN(log);
+
+  mesh->saveSTL("gyroidBlnXThick.stl");
+}
+
+TEST_CASE("Mesh::generate (schwartz)")
+{
+  //Brad
+  std::chrono::time_point<std::chrono::system_clock> start, end;
+  std::chrono::duration<double> elapsed;
+
+
+ auto scale = .125f;
+ auto radius = 1.5f;
+
+ 
+ auto sphere1 = sphere(3.0f, { 0.f,0.f,0.f });
+
+ Kernel::Tree box = max(max(max(max(max(Kernel::Tree::X() - radius, -Kernel::Tree::X() - radius),
+                        Kernel::Tree::Y() - radius), -Kernel::Tree::Y() - radius),
+                        Kernel::Tree::Z() - radius), -Kernel::Tree::Z() - radius);
+ Kernel::Tree schwarz = cos(Kernel::Tree::X() / scale) + cos(Kernel::Tree::Y() / scale) + cos(Kernel::Tree::Z() / scale);
+ Kernel::Tree boxschwarz = max(sphere1, schwarz);
+
+
+ Region<3> r({ -5, -5, -5 }, { 5, 5, 5 });
+ 
+ // Begin timekeeping
+  start = std::chrono::system_clock::now();
+ auto mesh = Mesh::render(boxschwarz, r, 0.05);
+  end = std::chrono::system_clock::now();
+ 
+  elapsed = end - start;
+ 
+ auto elapsed_ms =
+ std::chrono::duration_cast<std::chrono::milliseconds>(elapsed);
+ 
+ std::string log = "\nMade schwartz in " +
+ std::to_string(elapsed.count()) + " sec";
+ WARN(log);
+ 
+ mesh->saveSTL("schwartzBlnX.stl");
+
 }
 
 TEST_CASE("Mesh::render (face count in rectangular prism)")
