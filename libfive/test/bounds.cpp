@@ -59,7 +59,8 @@ TEST_CASE("findBounds")
 
     SECTION("Moved circle")
     {
-        auto s = move(circle(0.3), {0.3f, 0.3f, 0.f});
+        auto s = move(circle(0.3f), {0.3f, 0.3f, 0.f});
+
 
         auto r = findBounds(s);
         CAPTURE(r.lower);

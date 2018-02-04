@@ -19,11 +19,14 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #pragma once
 #include <map>
 #include <set>
+#include <numeric>
 
 #include <Eigen/Eigen>
 
 #include "libfive/tree/cache.hpp"
 #include "libfive/eval/eval_jacobian.hpp"
+
+#include <set>
 
 namespace Kernel {
 

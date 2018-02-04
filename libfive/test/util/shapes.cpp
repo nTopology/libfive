@@ -22,6 +22,11 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 using namespace Kernel;
 
+Kernel::Tree OpMix(Kernel::Tree tA, Kernel::Tree tB, float a)
+{
+  return tA * (1.0 - a) + tB * a;
+}
+
 Tree rectangle(float xmin, float xmax, float ymin, float ymax,
                Eigen::Matrix4f M)
 {
@@ -41,6 +46,100 @@ Tree rotate2d(Tree t, float angle)
 Tree move(Tree t, Eigen::Vector3f m)
 {
     return t.remap(Tree::X() - m.x(), Tree::Y() - m.y(), Tree::Z() - m.z());
+}
+
+Kernel::Tree CSGUnion(Kernel::Tree tA, Kernel::Tree tB)
+{
+ return min(tA, tB);
+}
+
+Kernel::Tree CSGSubtract(Kernel::Tree tA, Kernel::Tree tB)
+{
+  return CSGIntersect(tA, -tB);
+}
+
+Kernel::Tree CSGIntersect(Kernel::Tree tA, Kernel::Tree tB)
+{
+  return max(tA, tB);
+}
+
+Kernel::Tree CSGUnionRound(Kernel::Tree tA, Kernel::Tree tB, float r)
+{
+  auto vc0 = r - tA;
+  auto vc1 = r - tB;
+
+  auto u0 = max(vc0, 0.f);
+  auto u1 = max(vc1, 0.f);
+   
+  auto len = sqrt(square(u0) + square(u1));
+
+  return max(r, min(tA, tB)) - len;
+//   // The "Round" variant uses a quarter-circle to join the two objects smoothly:
+//   float fOpUnionRound(float a, float b, float r)
+//   {
+//     vec2 u = max(vec2(r - a, r - b), vec2(0));
+//     return max(r, min(a, b)) - length(u);
+//   }
+}
+
+Kernel::Tree CSGUnionChamfer(Kernel::Tree tA, Kernel::Tree tB, float r)
+{
+  return min(min(tA, tB), (tA - r + tB)*sqrt(0.5f));
+}
+
+Kernel::Tree offset(Kernel::Tree t, float r)
+{
+  return t + r;
+}
+
+Kernel::Tree shell(Kernel::Tree t, float r)
+{
+  return clearence(t, t, r);
+}
+
+Kernel::Tree clearence(Kernel::Tree tA, Kernel::Tree tB, float r)
+{
+  return CSGSubtract(tA, offset(tB, r));
+}
+
+Kernel::Tree blend(Kernel::Tree tA, Kernel::Tree tB, float r)
+{
+  return CSGUnion(tA, 
+                  CSGUnion(tB, (sqrt(abs(tA)) + sqrt(abs(tB))) - r));
+}
+
+Kernel::Tree loft(Kernel::Tree tA, Kernel::Tree tB, float zMin, float zMax)
+{
+  return max(max((Tree::Z() - zMax), 
+                 (zMin - Tree::Z())),
+             (((Tree::Z() - zMin)*tB) + 
+             ((zMax - Tree::Z())*tA)) 
+             / (zMax - zMin));
+}
+
+Kernel::Tree loftBetween(Kernel::Tree tA, 
+                         Kernel::Tree tB, 
+                         const Eigen::Vector3f& lower, 
+                         const Eigen::Vector3f& upper)
+{
+  auto x = Tree::X();
+  auto y = Tree::Y();
+  auto z = Tree::Z();
+
+  auto fz = (z - lower.z()) / (upper.z() - lower.z());
+
+  auto gz = (upper.z() - z) / (upper.z() - lower.z());
+
+
+  auto rmAx = x + fz * (lower.x() - upper.x());
+  auto rmAy = y + fz * (lower.y() - upper.y());
+  auto a = tA.remap(rmAx, rmAy, z);
+
+  auto rmBx = x + gz * (upper.x() - lower.x());
+  auto rmBy = y + gz * (upper.y() - lower.y());
+  auto b = tB.remap(rmBx, rmBy, z);
+
+  return loft(a, b, lower.z(), upper.z());
 }
 
 Tree recurse(float x, float y, float scale, Eigen::Matrix4f M, int i)
@@ -118,4 +217,10 @@ Tree box(const Eigen::Vector3f& lower, const Eigen::Vector3f& upper)
                    Tree::Y() - upper.y())),
                max(lower.z() - Tree::Z(),
                    Tree::Z() - upper.z()));
+}
+
+Tree CylinderYAxis(Eigen::Vector3f start, float r) {   
+  return r*r 
+    - square(Tree::X() - start.x()) 
+    - square(Tree::Z() - start.z());
 }

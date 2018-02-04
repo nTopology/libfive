@@ -1,4 +1,11 @@
-# Add a custom command that produces version.c, plus
+if(MSVC)
+    set(LINK_TYPE STATIC)
+else()
+    set(LINK_TYPE SHARED)
+endif()
+
+# Add a custom command that produces version.cpp, plus
+
 # a dummy output that's not actually produced, in order
 # to force version.cmake to always be re-run before the build
 ADD_CUSTOM_COMMAND(
@@ -6,7 +13,7 @@ ADD_CUSTOM_COMMAND(
            ${CMAKE_CURRENT_BINARY_DIR}/_version.c
     COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_SOURCE_DIR}/version.cmake)
 
-add_library(five SHARED
+add_library(five ${LINK_TYPE}
     eval/base.cpp
     eval/eval_interval.cpp
     eval/eval_jacobian.cpp
@@ -34,6 +41,7 @@ add_library(five SHARED
 
     ${CMAKE_CURRENT_BINARY_DIR}/version.c
 )
+
 
 target_include_directories(five SYSTEM PUBLIC
     ${Boost_INCLUDE_DIRS}

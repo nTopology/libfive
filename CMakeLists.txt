@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.3)
 project(libfive)
 
+set (PKG_CONFIG_EXECUTABLE C:/libs/pkg/bin/pkg-config.exe)
+set (PKG_CONFIG_PATH C:/libs/pkg)
+
+
 # Properly distinguish between Apple and upstream Clang
 cmake_policy(SET CMP0025 NEW)
 
@@ -9,15 +13,15 @@ set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 
 ################################################################################
 
-set(CMAKE_CXX_FLAGS "-Wall -Wextra -g -fPIC -pedantic -Werror=switch -march=native")
-if (APPLE)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
-else()
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -lstdc++")
-endif()
 
-set(CMAKE_CXX_FLAGS_RELEASE  "-O3 -DRELEASE -DEIGEN_NO_DEBUG")
-set(CMAKE_CXX_FLAGS_DEBUG    "-O0")
+if(MSVC)
+    set(CMAKE_CXX_FLAGS "-Wall -bigobj ")
+    set(CMAKE_CXX_FLAGS_RELEASE  "-DRELEASE -DEIGEN_NO_DEBUG")
+else()
+    set(CMAKE_CXX_FLAGS "-Wall -Wextra -g -fPIC -pedantic -Werror=switch -march=native")
+    set(CMAKE_CXX_FLAGS_RELEASE  "-DRELEASE -DEIGEN_NO_DEBUG")
+    set(CMAKE_CXX_FLAGS_DEBUG    "-O0")
+endif()
 
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -39,9 +43,11 @@ find_package(Qt5Core)
 find_package(Boost REQUIRED)
 find_package(PNG REQUIRED)
 
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(GUILE guile-2.2)
-pkg_check_modules(EIGEN REQUIRED eigen3)
+if(APPLE)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(GUILE guile-2.2)
+    pkg_check_modules(EIGEN REQUIRED eigen3)
+endif(APPLE)
 
 if (UNIX AND NOT(APPLE))
     find_package(Threads REQUIRED)
@@ -81,3 +87,9 @@ add_subdirectory(libfive)
 if(GUILE_FOUND AND Qt5Core_FOUND)
     add_subdirectory(studio)
 endif(GUILE_FOUND AND Qt5Core_FOUND)
+
+if(MSVC)
+    target_compile_definitions(five PUBLIC
+        D_SCL_SECURE_NO_WARNINGS
+        _USE_MATH_DEFINES)
+endif()
