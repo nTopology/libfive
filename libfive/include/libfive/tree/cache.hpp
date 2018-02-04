@@ -66,6 +66,19 @@ public:
     void del(float v);
     void del(Opcode::Opcode op, Node lhs=nullptr, Node rhs=nullptr);
 
+    /*
+     *  Returns the given node as an affine sum-of-multiplications
+     *
+     *  This is a building block for automatic collapsing of affine
+     *  expressions, exposed here primarily for unit testing.
+     */
+    std::map<Node, float> asAffine(Node n);
+
+    /*
+     *  Converts a sum-of-multiplications into an affine tree.
+     */
+    Node fromAffine(const std::map<Node, float>& ns);
+
 protected:
     /*
      *  Cache constructor is private so outsiders must use instance()
@@ -84,6 +97,12 @@ protected:
      *  to keep it as balanced as possible.
      */
     Node checkCommutative(Opcode::Opcode op, Node a, Node b);
+
+    /*
+     *  Checks whether a `op` b can be replaced by a simpler affine
+     *  form, e.g. (2*x + y) - (4*y) --> 2*x - 3*y
+     */
+    Node checkAffine(Opcode::Opcode op, Node a, Node b);
 
     /*
      *  A Key uniquely identifies an operation Node, so that we can

@@ -13,6 +13,7 @@ set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 
 ################################################################################
 
+
 if(MSVC)
     set(CMAKE_CXX_FLAGS "-Wall -bigobj ")
     set(CMAKE_CXX_FLAGS_RELEASE  "-DRELEASE -DEIGEN_NO_DEBUG")
@@ -29,6 +30,11 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 
 if(APPLE)
     set(CMAKE_MACOSX_RPATH ON)
+endif()
+
+# Work around an issue with Boost::Interval on OpenBSD
+if ("${CMAKE_SYSTEM_NAME}" STREQUAL "OpenBSD")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D__USE_ISOC99")
 endif()
 
 ################################################################################

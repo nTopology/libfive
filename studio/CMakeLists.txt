@@ -20,7 +20,6 @@ set(SRCS src/main.cpp
     src/busy.cpp
     src/camera.cpp
     src/documentation.cpp
-    src/icosphere.cpp
     src/script.cpp
     src/settings.cpp
     src/shader.cpp
@@ -56,6 +55,10 @@ if(APPLE)
 else()
     add_executable(Studio ${SRCS} ${QOBJECTS})
 endif()
+
+if(UNIX AND NOT(APPLE))
+    install(TARGETS Studio DESTINATION bin RENAME studio)
+endif(UNIX AND NOT(APPLE))
 
 target_include_directories(Studio PUBLIC include)
 target_link_libraries(Studio five-guile

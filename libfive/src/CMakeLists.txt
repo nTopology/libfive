@@ -26,7 +26,8 @@ add_library(five ${LINK_TYPE}
     eval/feature.cpp
     render/discrete/heightmap.cpp
     render/discrete/voxels.cpp
-    render/brep/xtree.cpp
+    render/brep/xtree2.cpp
+    render/brep/xtree3.cpp
     render/brep/contours.cpp
     render/brep/mesh.cpp
     render/brep/marching.cpp
@@ -56,5 +57,11 @@ set(LIBS ${PNG_LIBRARIES})
 if(UNIX AND NOT(APPLE))
     set(LIBS ${LIBS} ${CMAKE_THREAD_LIBS_INIT})
 endif(UNIX AND NOT(APPLE))
+
+if (UNIX)
+    install(TARGETS five DESTINATION lib)
+    install(FILES ../include/libfive.h DESTINATION include)
+    install(DIRECTORY ../include/libfive DESTINATION include)
+endif(UNIX)
 
 target_link_libraries(five ${LIBS})

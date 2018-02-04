@@ -54,14 +54,14 @@ Region<3> findBounds(IntervalEvaluator* eval)
       return eval->eval({l0,l1,l2},
                         {u0,u1,u2}).lower();
     };
+  
  /*
-
-
     // Helper function to load and evaluate an interval
     auto testRegion = [=](const Region<3>& r){
         return eval->eval(r.lower.template cast<float>(),
                           r.upper.template cast<float>()).lower(); };
 */
+
 
     // Helper function to check a particular [axis + sign + value].
     //
@@ -100,10 +100,10 @@ Region<3> findBounds(IntervalEvaluator* eval)
 
                 for (unsigned j=0; j < n; ++j)
                 {
-                    target.lower(r) = (out.lower(r) * (n - i) / float(n)) +
-                                      (out.upper(r) * i / float(n));
-                    target.upper(r) = (out.lower(r) * (n - i - 1) / float(n)) +
-                                      (out.upper(r) * (i + 1) / float(n));
+                    target.lower(r) = (out.lower(r) * (n - j) / float(n)) +
+                                      (out.upper(r) * j / float(n));
+                    target.upper(r) = (out.lower(r) * (n - j - 1) / float(n)) +
+                                      (out.upper(r) * (j + 1) / float(n));
                     o = fmin(o, testRegion(target));
                 }
             }
