@@ -11,6 +11,12 @@ You can obtain one at http://mozilla.org/MPL/2.0/.
 #include "libfive/render/brep/object_pool.hpp"
 #include "libfive/render/brep/progress.hpp"
 
+#define LIBFIVE_DEBUGDATA
+
+#ifdef LIBFIVE_DEBUGDATA
+#include <set>
+#endif
+
 namespace Kernel {
 
 template <typename T>
@@ -57,6 +63,15 @@ public:
 
     int64_t size() const { return tree_count; }
 
+    // Because the algorithm assigns trees to their parents only once
+    // they are done, it can be difficult to determine what is
+    // going wrong when they fail to ever finish.  This provides an
+    // easier way to access them via a debugger, at a small performance cost.
+#ifdef LIBFIVE_DEBUGDATA
+    std::set<T*> debug_access_undone;
+    std::set<T*> debug_access_done;
+
+#endif
 protected:
     T* ptr;
     typename T::Pool object_pool;

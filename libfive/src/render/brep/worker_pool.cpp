@@ -144,6 +144,15 @@ void WorkerPool<T, Neighbors, N>::run(
         if (can_subdivide)
         {
             tape = t->evalInterval(eval, task.tape, region, object_pool);
+#ifdef LIBFIVE_DEBUGDATA
+            if (t->type == Interval::FILLED || t->type == Interval::EMPTY)
+            {
+              root_lock.lock();
+              root.debug_access_undone.erase(t);
+              root.debug_access_done.insert(t);
+              root_lock.unlock();
+            }
+#endif
 
             // If this Tree is ambiguous, then push the children to the stack
             // and keep going (because all the useful work will be done
@@ -158,6 +167,11 @@ void WorkerPool<T, Neighbors, N>::run(
                     // to the queue; otherwise, undo the decrement and
                     // assign it to be evaluated locally.
                     auto next_tree = object_pool.get(t, i, rs[i]);
+#ifdef LIBFIVE_DEBUGDATA
+                    root_lock.lock();
+                    root.debug_access_undone.insert(next_tree);
+                    root_lock.unlock();
+#endif
                     Task next{next_tree, tape, rs[i], neighbors};
                     if (!tasks.bounded_push(next))
                     {
@@ -177,6 +191,12 @@ void WorkerPool<T, Neighbors, N>::run(
         else
         {
             t->evalLeaf(eval, tape, region, object_pool, neighbors);
+#ifdef LIBFIVE_DEBUGDATA
+            root_lock.lock();
+            root.debug_access_undone.erase(t);
+            root.debug_access_done.insert(t);
+            root_lock.unlock();
+#endif
         }
 
         if (progress)
@@ -210,6 +230,12 @@ void WorkerPool<T, Neighbors, N>::run(
         while (t != nullptr &&
                t->collectChildren(eval, tape, region, object_pool, max_err))
         {
+#ifdef LIBFIVE_DEBUGDATA
+          root_lock.lock();
+          root.debug_access_undone.erase(t);
+          root.debug_access_done.insert(t);
+          root_lock.unlock();
+#endif
             // Report the volume of completed trees as we walk back
             // up towards the root of the tree.
             if (progress) {
