@@ -193,4 +193,46 @@ TEST_CASE("FeatureEvaluator::features")
         FeatureEvaluator e(r);
         REQUIRE(e.features({0, 0, 0}).size() == 1);
     }
+
+    SECTION("Very simple Oracle")
+    {
+        Tree x = convertToOracleAxes(Tree::X());
+        FeatureEvaluator e(x);
+        auto fs = e.features({1.25, 1.25, 1.5});
+        REQUIRE(fs.size() == 1);
+    }
+
+    SECTION("Oracle features")
+    {
+        auto cube = max(max(
+            max(-(Tree::X() + 1.5),
+                  Tree::X() - 1.5),
+            max(-(Tree::Y() + 1.5),
+                  Tree::Y() - 1.5)),
+            max(-(Tree::Z() + 1.5),
+                  Tree::Z() - 1.5));
+        Tree cubeOracle = convertToOracleAxes(cube);
+        FeatureEvaluator e(cubeOracle);
+        auto fs = e.features({1.25, 1.25, 1.5});
+        REQUIRE(fs.size() == 1);
+    }
+
+    SECTION("Many ambiguities")
+    {
+        // This is based on the 'Abs and skew applied to Oracle' test in
+        // test/transformed_oracle.cpp, in which the Oracle gives the correct
+        // results but the ordinary tree does not.
+        auto y = max(-(Tree::Y() + 1.5), Tree::Y() - 1.5);
+        FeatureEvaluator ey(y);
+        REQUIRE(ey.features({0, 0, 0}).size() == 2);
+
+        auto x = max(-(Tree::X() + 1.5), Tree::X() - 1.5);
+        FeatureEvaluator ex(x);
+        REQUIRE(ex.features({0, 0, 0}).size() == 2);
+
+        auto xy = max(x, y);
+        FeatureEvaluator exy(xy);
+        auto fs = exy.features({0, 0, 0});
+        REQUIRE(fs.size() == 4);
+    }
 }
