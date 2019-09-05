@@ -71,6 +71,12 @@ public:
     const VolTree* vol;
 
     mutable std::atomic_bool cancel;
+
+    /* Added to ensure libfive's DC algorithm synthesizes and mantains the quads field of the generated mesh - mlf */
+    bool keepQuads;
+
+    /* Added to optionally disable DC optimizaiton (collapsing of quads based on partial deriv.) - mlf*/
+    bool disableOptimization;
 };
 
 }

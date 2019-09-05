@@ -27,8 +27,12 @@ public:
     using Output = Mesh;
     using Input = DCTree<3>;
 
-    DCMesher(PerThreadBRep<3>& m) : m(m)
+    DCMesher(PerThreadBRep<3>& m) : m(m), keepQuads(false)
         {   /* Nothing to do here */    }
+
+    DCMesher(PerThreadBRep<3>& m, bool keepQuads) : m(m), keepQuads(keepQuads)
+    {   /* Nothing to do here */
+    }
 
     /*
      *  Called by Dual::walk to construct the triangle mesh
@@ -82,6 +86,7 @@ protected:
 #endif
 
     PerThreadBRep<3>& m;
+    bool keepQuads;
 };
 
 }   // namespace libfive

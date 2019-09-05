@@ -704,6 +704,13 @@ bool DCTree<N>::collectChildren(Evaluator* eval,
 
     auto corner_mask = buildCornerMask(corners);
 
+    // Don't collapse anything if optimizations are disabled -mlf
+    if(eval->isOptimizationDisabled())
+    {
+      this->done();
+      return true;
+    }
+
     //  This conditional implements the three checks described in
     //  [Ju et al, 2002] in the section titled
     //      "Simplification with topology safety"

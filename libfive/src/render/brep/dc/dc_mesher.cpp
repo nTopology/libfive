@@ -220,11 +220,20 @@ void DCMesher::load(const std::array<const DCTree<3>*, 4>& ts, unsigned index)
 
     if (norms[0].dot(norms[3]) > norms[1].dot(norms[2]))
     {
+        if(keepQuads)
+        {
+          //m.quads.push_back({ vs[2], vs[3], vs[1], vs[0] });            
+          m.quads.push_back({ vs[0], vs[1], vs[3], vs[2] });
+        }
         push_triangle(vs[0], vs[1], vs[2]);
         push_triangle(vs[2], vs[1], vs[3]);
     }
     else
     {
+        if(keepQuads)
+        {
+          m.quads.push_back({ vs[0], vs[1], vs[3], vs[2] });
+        }
         push_triangle(vs[0], vs[1], vs[3]);
         push_triangle(vs[0], vs[3], vs[2]);
     }

@@ -42,6 +42,9 @@ std::unique_ptr<Mesh> Mesh::render(const Tree t, const Region<3>& r,
     es.reserve(settings.workers);
     for (unsigned i=0; i < settings.workers; ++i) {
         es.emplace_back(Evaluator(t));
+
+        if(settings.disableOptimization)
+          es.back().setOptimizationDisabled(true);
     }
 
     return render(es.data(), r, settings);
@@ -74,7 +77,7 @@ std::unique_ptr<Mesh> Mesh::render(
 #endif
 
         // Perform marching squares
-        out = Dual<3>::walk<DCMesher>(t, settings);
+        out = Dual<3>::walk<DCMesher>(t, settings, settings.keepQuads);
 
         // TODO: check for early return here again
         t.reset(settings);

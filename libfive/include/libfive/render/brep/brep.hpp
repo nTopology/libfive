@@ -33,6 +33,12 @@ public:
     std::vector<Eigen::Matrix<uint32_t, N, 1>,
                 Eigen::aligned_allocator<Eigen::Matrix<uint32_t, N, 1>>> branes;
 
+    //added quads to this so we can keep track of entire quads as well as "branes" -mlf
+    std::vector<Eigen::Matrix<uint32_t, 4, 1>,
+      Eigen::aligned_allocator<Eigen::Matrix<uint32_t, 4, 1>>> quads;
+
+    inline bool hasQuads() const { return !quads.empty(); }
+
     uint32_t pushVertex(const Eigen::Matrix<float, N, 1>& v) {
         uint32_t out = verts.size();
         verts.push_back(v);
@@ -62,19 +68,22 @@ public:
         // to be dropping items in through multiple threads.
         size_t num_verts = 1;
         size_t num_branes = 0;
+        size_t num_quads = 0;
         for (const auto& c : children) {
             num_verts += c.verts.size();
             num_branes += c.branes.size();
+            num_quads += c.quads.size();
         }
         verts.resize(num_verts);
         branes.resize(num_branes);
+        quads.resize(num_quads);
 
         std::vector<std::future<void>> futures;
         futures.resize(workers);
 
         for (unsigned i=0; i < workers; ++i) {
             futures[i] = std::async(std::launch::async,
-                [i, workers, this, &children]() {
+                [i, num_quads, workers, this, &children]() {
                     for (unsigned j=i; j < children.size(); j += workers) {
                         const auto& c = children[j];
 
@@ -95,6 +104,17 @@ public:
                         // Then save all of the branes
                         for (unsigned k=0; k < c.branes.size(); ++k) {
                             branes[offset + k] = c.branes[k];
+                        }
+
+                        // And the (optional) quads
+                        if(num_quads) {
+                          offset = 0;
+                          for(unsigned k = 0; k < j; ++k) {
+                            offset += children[k].quads.size();
+                          }
+                          for(unsigned k = 0; k < c.quads.size(); ++k) {
+                            quads[offset + k] = c.quads[k];
+                          }
                         }
                     }
                 }

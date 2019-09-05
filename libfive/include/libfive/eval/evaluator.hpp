@@ -48,6 +48,12 @@ public:
         }
         return changed;
 }
+
+    //In certain cases, DC optimization is hurting more than helping -mlf
+    inline void setOptimizationDisabled(bool b) { disableOptimization = b; }
+    inline bool isOptimizationDisabled() { return disableOptimization; }
+
+    bool disableOptimization = false;
 };
 
 }   // namespace libfive

@@ -56,6 +56,11 @@ public:
                 Eigen::aligned_allocator<Eigen::Matrix<float, N, 1>>> verts;
     std::vector<Eigen::Matrix<uint32_t, N, 1>,
                 Eigen::aligned_allocator<Eigen::Matrix<uint32_t, N, 1>>> branes;
+
+    //added quads to this so we can keep track of entire quads as well as "branes" -mlf
+    std::vector<Eigen::Matrix<uint32_t, 4, 1>,
+      Eigen::aligned_allocator<Eigen::Matrix<uint32_t, 4, 1>>> quads;
+
     std::vector<uint32_t> indices;
 
 protected:
