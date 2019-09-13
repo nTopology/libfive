@@ -20,12 +20,6 @@ class Tape; /* Forward declaration */
 class IntervalEvaluator : public virtual BaseEvaluator
 {
 public:
-    struct Result {
-        Interval::I i;
-        bool safe;
-        std::shared_ptr<Tape> tape;
-    };
-
     IntervalEvaluator(const Tree& root);
     IntervalEvaluator(const Tree& root,
                       const std::map<Tree::Id, float>& vars);
@@ -36,22 +30,19 @@ public:
     /*
      *  Interval evaluation
      */
-    Interval::I eval(const Eigen::Vector3f& lower,
-                     const Eigen::Vector3f& upper);
-    Interval::I eval(const Eigen::Vector3f& lower,
-                     const Eigen::Vector3f& upper,
-                     const std::shared_ptr<Tape>& tape);
+    Interval eval(const Eigen::Vector3f& lower,
+                  const Eigen::Vector3f& upper);
+    Interval eval(const Eigen::Vector3f& lower,
+                  const Eigen::Vector3f& upper,
+                  const std::shared_ptr<Tape>& tape);
 
-    /*  Helper function to return a full Result */
-    Result eval_(const Eigen::Vector3f& lower,
-                 const Eigen::Vector3f& upper,
-                 const std::shared_ptr<Tape>& tape);
-
-    Result intervalAndPush(const Eigen::Vector3f& lower,
-                           const Eigen::Vector3f& upper);
-    Result intervalAndPush(const Eigen::Vector3f& lower,
-                           const Eigen::Vector3f& upper,
-                           const std::shared_ptr<Tape>& tape);
+    std::pair<Interval, std::shared_ptr<Tape>> intervalAndPush(
+            const Eigen::Vector3f& lower,
+            const Eigen::Vector3f& upper);
+    std::pair<Interval, std::shared_ptr<Tape>> intervalAndPush(
+            const Eigen::Vector3f& lower,
+            const Eigen::Vector3f& upper,
+            const std::shared_ptr<Tape>& tape);
 
     /*
      *  Returns a shortened tape based on the most recent evaluation.
@@ -73,11 +64,7 @@ public:
 
 protected:
     /*  i[clause] is the interval result for that clause, */
-    std::vector<Interval::I> i;
-
-    /*  maybe_nan[clause] indicates whether the result might be NaN (which is
-     *  generally not included in interval evaluation) */
-    std::vector<bool> maybe_nan;
+    std::vector<Interval> i;
 
      /* Sets i[index] = f and maybe_nan[index] = std::isnan(f) */
      void store(float f, size_t index);

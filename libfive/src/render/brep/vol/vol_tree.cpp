@@ -46,22 +46,22 @@ Tape::Handle VolTree::evalInterval(Evaluator* eval,
             this->region.upper3().template cast<float>(),
             tape);
 
-    this->type = Interval::state(o.i);
-    if (!o.safe)
+    this->type = o.first.state();
+    if (!o.first.isSafe())
     {
-        this->type = Interval::AMBIGUOUS;
+        assert(this->type == Interval::AMBIGUOUS);
         return tape;
     }
 
     if (this->type == Interval::FILLED || this->type == Interval::EMPTY)
     {
         this->done();
-        if (tape != o.tape) {
-            eval->getDeck()->claim(std::move(o.tape));
+        if (tape != o.second) {
+            eval->getDeck()->claim(std::move(o.second));
             return nullptr;
         }
     }
-    return o.tape;
+    return o.second;
 }
 
 void VolTree::evalLeaf(Evaluator* eval,
@@ -75,17 +75,18 @@ void VolTree::evalLeaf(Evaluator* eval,
             this->region.upper3().template cast<float>(),
             tape);
 
-    this->type = Interval::state(o.i);
-    if (!o.safe)
+    this->type = o.first.state();
+    if (!o.first.isSafe())
     {
+        assert(this->type == Interval::AMBIGUOUS);
         this->type = Interval::AMBIGUOUS;
     }
 
     if (this->type == Interval::FILLED || this->type == Interval::EMPTY)
     {
         this->done();
-        if (tape != o.tape) {
-            eval->getDeck()->claim(std::move(o.tape));
+        if (tape != o.second) {
+            eval->getDeck()->claim(std::move(o.second));
         }
     }
     this->done();

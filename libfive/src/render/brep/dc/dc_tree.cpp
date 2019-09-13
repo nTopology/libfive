@@ -105,22 +105,22 @@ Tape::Handle DCTree<N>::evalInterval(Evaluator* eval,
             this->region.upper3().template cast<float>(),
             tape);
 
-    this->type = Interval::state(o.i);
-    if (!o.safe)
+    this->type = o.first.state();
+    if (!o.first.isSafe())
     {
-        this->type = Interval::AMBIGUOUS;
+        assert(this->type == Interval::AMBIGUOUS);
         return tape;
     }
 
     if (this->type == Interval::FILLED || this->type == Interval::EMPTY)
     {
         this->done();
-        if (tape != o.tape) {
-            eval->getDeck()->claim(std::move(o.tape));
+        if (tape != o.second) {
+            eval->getDeck()->claim(std::move(o.second));
             return nullptr;
         }
     }
-    return o.tape;
+    return o.second;
 }
 
 template <unsigned N>
@@ -1028,6 +1028,56 @@ void DCTree<N>::releaseTo(Pool& object_pool) {
     }
 
     object_pool.put(this);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+template <unsigned N>
+bool DCTree<N>::checkConsistency() const
+{
+    return checkConsistency(DCNeighbors<N>());
+}
+
+template <unsigned N>
+bool DCTree<N>::checkConsistency(const DCNeighbors<N>& neighbors) const
+{
+    if (this->isBranch()) {
+        for (unsigned i=0; i < this->children.size(); ++i) {
+            auto next = neighbors.push(i, this->children);
+            if (!this->children[i].load()->checkConsistency(next)) {
+                return false;
+            }
+        }
+    } else {
+        for (unsigned i=0; i < this->children.size(); ++i) {
+            auto r = neighbors.checkConsistency(i, cornerState(i));
+            if (r.first != nullptr) {
+                std::cerr << "Mismatch detected:\n"
+                    << "  Tree A:\n"
+                    << "    [" << this->region.lower.transpose() << "]\n"
+                    << "    [" << this->region.upper.transpose() << "]\n"
+                    << "    type: " << this->type << "\n"
+                    << "    branch: "
+                        << (this->isBranch() ? "yes" : "no") << "\n"
+                    << "    rank: " << this->rank() << "\n"
+                    << "    corner " << i << " at ["
+                        << this->region.corner(i).transpose()
+                        << "]: " << cornerState(i) << "\n"
+                    << "  Tree B:\n"
+                    << "    [" << r.first->region.lower.transpose() << "]\n"
+                    << "    [" << r.first->region.upper.transpose() << "]\n"
+                    << "    type: " << r.first->type << "\n"
+                    << "    branch: "
+                        << (r.first->isBranch() ? "yes" : "no") << "\n"
+                    << "    rank: " << r.first->rank() << "\n"
+                    << "    corner " << r.second << " at ["
+                        << r.first->region.corner(r.second).transpose() << "]: "
+                        << r.first->cornerState(r.second) << "\n";
+                return false;
+            }
+        }
+    }
+    return true;
 }
 
 }   // namespace libfive

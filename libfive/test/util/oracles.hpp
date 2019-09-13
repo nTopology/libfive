@@ -19,10 +19,9 @@ namespace libfive {
 template <int A>
 class AxisOracle : public OracleStorage<>
 {
-    void evalInterval(Interval::I& out, bool& maybe_nan) override
+    void evalInterval(Interval& out) override
     {
         out = {lower(A), upper(A)};
-        maybe_nan = false;
     }
 
     void evalPoint(float& out, size_t index) override
@@ -74,20 +73,18 @@ inline Tree convertToOracleAxes(Tree t)
 
 class CubeOracle : public OracleStorage<>
 {
-    void evalInterval(Interval::I& out, bool& maybe_nan) override
+    void evalInterval(Interval& out) override
     {
         using namespace boost::numeric; // for max
 
-        Interval::I X(lower.x(), upper.x());
-        Interval::I Y(lower.y(), upper.y());
-        Interval::I Z(lower.z(), upper.z());
+        Interval X(lower.x(), upper.x());
+        Interval Y(lower.y(), upper.y());
+        Interval Z(lower.z(), upper.z());
 
-        out = max(max(
-            max(-(X + 1.5f), X - 1.5f),
-            max(-(Y + 1.5f), Y - 1.5f)),
-            max(-(Z + 1.5f), Z - 1.5f));
-
-        maybe_nan = false;
+        out = Interval::max(Interval::max(
+            Interval::max(-(X + 1.5f), X - 1.5f),
+            Interval::max(-(Y + 1.5f), Y - 1.5f)),
+            Interval::max(-(Z + 1.5f), Z - 1.5f));
     }
 
     void evalPoint(float& out, size_t index) override

@@ -38,7 +38,6 @@ IntervalEvaluator::IntervalEvaluator(
     : BaseEvaluator(d, vars)
 {
     i.resize(d->num_clauses + 1);
-    maybe_nan.resize(d->num_clauses + 1);
 
     // Unpack variables into result array
     for (auto& v : d->vars.right)
@@ -57,25 +56,16 @@ IntervalEvaluator::IntervalEvaluator(
 
 void IntervalEvaluator::store(float f, size_t index)
 {
-    const bool is_nan = std::isnan(f);
-    i[index] = is_nan ? Interval::I::empty() : f;
-    maybe_nan[index] = is_nan;
+    i[index] = Interval(f, f);
 }
 
-Interval::I IntervalEvaluator::eval(const Eigen::Vector3f& lower,
-                                    const Eigen::Vector3f& upper)
+Interval IntervalEvaluator::eval(const Eigen::Vector3f& lower,
+                                 const Eigen::Vector3f& upper)
 {
     return eval(lower, upper, deck->tape);
 }
 
-Interval::I IntervalEvaluator::eval(const Eigen::Vector3f& lower,
-                                    const Eigen::Vector3f& upper,
-                                    const Tape::Handle& tape)
-{
-    return eval_(lower, upper, tape).i;
-}
-
-IntervalEvaluator::Result IntervalEvaluator::eval_(
+Interval IntervalEvaluator::eval(
         const Eigen::Vector3f& lower,
         const Eigen::Vector3f& upper,
         const Tape::Handle& tape)
@@ -86,9 +76,6 @@ IntervalEvaluator::Result IntervalEvaluator::eval_(
     i[deck->X] = {lower.x(), upper.x()};
     i[deck->Y] = {lower.y(), upper.y()};
     i[deck->Z] = {lower.z(), upper.z()};
-    maybe_nan[deck->X] = false;
-    maybe_nan[deck->Y] = false;
-    maybe_nan[deck->Z] = false;
 
     for (auto& o : deck->oracles)
     {
@@ -102,24 +89,23 @@ IntervalEvaluator::Result IntervalEvaluator::eval_(
     deck->unbindOracles();
 
     auto root = tape->root();
-    return {i[root], !maybe_nan[root], nullptr};
+    return i[root];
 }
 
-IntervalEvaluator::Result IntervalEvaluator::intervalAndPush(
+std::pair<Interval, Tape::Handle> IntervalEvaluator::intervalAndPush(
         const Eigen::Vector3f& lower,
         const Eigen::Vector3f& upper)
 {
     return intervalAndPush(lower, upper, deck->tape);
 }
 
-IntervalEvaluator::Result IntervalEvaluator::intervalAndPush(
+std::pair<Interval, Tape::Handle> IntervalEvaluator::intervalAndPush(
         const Eigen::Vector3f& lower,
         const Eigen::Vector3f& upper,
         const Tape::Handle& tape)
 {
-    auto out = eval_(lower, upper, tape);
-    out.tape = push(tape);
-    return out;
+    auto out = eval(lower, upper, tape);
+    return std::make_pair(out, push(tape));
 }
 
 Tape::Handle IntervalEvaluator::push()
@@ -149,16 +135,13 @@ Tape::Handle IntervalEvaluator::push(const Tape::Handle& tape)
             {
                 return Tape::KEEP_A;
             }
-            else if (!maybe_nan[a] && !maybe_nan[b])
+            else if (i[a].lower() > i[b].upper())
             {
-                if (i[a].lower() > i[b].upper())
-                {
-                    return Tape::KEEP_A;
-                }
-                else if (i[b].lower() > i[a].upper())
-                {
-                    return Tape::KEEP_B;
-                }
+                return Tape::KEEP_A;
+            }
+            else if (i[b].lower() > i[a].upper())
+            {
+                return Tape::KEEP_B;
             }
             return Tape::KEEP_BOTH;
         }
@@ -168,16 +151,13 @@ Tape::Handle IntervalEvaluator::push(const Tape::Handle& tape)
             {
                 return Tape::KEEP_A;
             }
-            else if (!maybe_nan[a] && !maybe_nan[b])
+            else if (i[a].lower() > i[b].upper())
             {
-                if (i[a].lower() > i[b].upper())
-                {
-                    return Tape::KEEP_B;
-                }
-                else if (i[b].lower() > i[a].upper())
-                {
-                    return Tape::KEEP_A;
-                }
+                return Tape::KEEP_B;
+            }
+            else if (i[b].lower() > i[a].upper())
+            {
+                return Tape::KEEP_A;
             }
             return Tape::KEEP_BOTH;
         }
@@ -193,7 +173,8 @@ bool IntervalEvaluator::setVar(Tree::Id var, float value)
     auto v = deck->vars.right.find(var);
     if (v != deck->vars.right.end())
     {
-        const bool changed = (i[v->second] != value);
+        const bool changed = (i[v->second].lower() != value) ||
+                             (i[v->second].upper() != value);
         store(value, v->second);
         return changed;
     }
@@ -211,252 +192,92 @@ void IntervalEvaluator::operator()(Opcode::Opcode op, Clause::Id id,
 #define out i[id]
 #define a i[a_]
 #define b i[b_]
-#define outN maybe_nan[id]
-#define aN maybe_nan[a_]
-#define bN maybe_nan[b_]
-#define SET_UNSAFE(cond) outN = (aN) || (bN) || (cond)
-  switch (op) {
+
+    switch (op) {
         case Opcode::OP_ADD:
             out = a + b;
-            SET_UNSAFE((a.lower() == -INFINITY && b.upper() == INFINITY) ||
-                       (b.lower() == -INFINITY && a.upper() == INFINITY));
             break;
         case Opcode::OP_MUL:
             out = a * b;
-            SET_UNSAFE(
-                ((a.lower() == -INFINITY || a.upper() == INFINITY)
-                    && b.lower() <= 0.f && b.upper() >= 0.f) ||
-                ((b.lower() == -INFINITY || b.upper() == INFINITY)
-                    && a.lower() <= 0.f && a.upper() >= 0.f));
             break;
         case Opcode::OP_MIN:
-            out = boost::numeric::min(a, b);
-            // fmin returns NaN iff both inputs are NaN, so:
-            if (aN)
-            {
-                out = hull(out, b);
-            }
-            if (bN)
-            {
-                out = hull(out, a);
-            }
-            outN = aN && bN;
+            out = Interval::min(a, b);
             break;
         case Opcode::OP_MAX:
-            out = boost::numeric::max(a, b);
-            // fmax returns NaN iff both inputs are NaN, so:
-            if (aN)
-            {
-                out = hull(out, b);
-            }
-            if (bN)
-            {
-                out = hull(out, a);
-            }
-            outN = aN && bN;
+            out = Interval::max(a, b);
             break;
         case Opcode::OP_SUB:
             out = a - b;
-            SET_UNSAFE((a.lower() == -INFINITY && b.lower() == -INFINITY) ||
-                       (a.upper() == -INFINITY && b.upper() == -INFINITY));
             break;
         case Opcode::OP_DIV:
             out = a / b;
-            if (b.lower() == 0.f && b.upper() == 0.f)
-            {
-                // In this case, out gives us the empty interval, but point
-                // evaluation might give us an infinite value.
-                if ((a.lower() <= 0.f && a.upper() >= 0.f) ||
-                    std::signbit(b.lower()) != std::signbit(b.upper()))
-                {
-                    out = { -INFINITY, INFINITY };
-                }
-                else if (std::signbit(b.lower()) == (a.upper() < 0.f))
-                {
-                    out = { INFINITY, INFINITY };
-                }
-                else
-                {
-                    out = { -INFINITY, -INFINITY };
-                }
-            }
-            SET_UNSAFE(((a.lower() == -INFINITY || a.upper() == INFINITY) &&
-                        (b.lower() == -INFINITY || b.upper() == INFINITY)) ||
-                        (a.lower() <= 0.f && a.upper() >= 0.f &&
-                         b.lower() <= 0.f && b.upper() >= 0.f));
             break;
         case Opcode::OP_ATAN2:
-            out = atan2(a, b);
-            SET_UNSAFE(a.lower() <= 0.f && a.upper() >= 0.f &&
-                       b.lower() <= 0.f && b.upper() >= 0.f);
+            out = Interval::atan2(a, b);
             break;
         case Opcode::OP_POW:
-        {
-            auto bPt = b.lower();
-            out = boost::numeric::pow(a, bPt);
-            // The behavior of raising zero to a negative power is
-            // implementation-defined; it may raise a domain error (and thus
-            // return NaN) or a pole error (and thus return an infinite value);
-            // We can use a static const variable to test for this.
-
-            // Other cases that produce NaN are 0^0, or a negative number to a
-            // noninteger; we can use std::pow explicitly to test whether b is
-            // considered an integer as far as std::pow is concerned.
-            static const auto nanOnZeroToNegative =
-                std::isnan(std::pow(0.f, -1.f));
-
-            // Store whether a contains 0, to simplify the expression below.
-            const bool a_zero = a.lower() <= 0.f && a.upper() >= 0.f;
-
-            SET_UNSAFE(
-               (a_zero && (bPt == 0.f || (bPt < 0.f && nanOnZeroToNegative))) ||
-               (a.lower() < 0 && std::isnan(std::pow(-1.f, bPt))));
+            out = Interval::pow(a, b);
             break;
-        }
         case Opcode::OP_NTH_ROOT:
-        {
-            int bPt = b.lower();
-            out = boost::numeric::nth_root(a, bPt);
-            // We can only take multiples-of-two nth roots on negative values
-            SET_UNSAFE(a.lower() <= 0.f && !(bPt & 2));
+            out = Interval::nth_root(a, b);
             break;
-        }
         case Opcode::OP_MOD:
-        {
-            out = { 0.f , fmax(fabs(b.lower()), fabs(b.upper())) };
-            if (std::isfinite(a.upper()) && std::isfinite(a.lower()))
-            {
-                // We may be able to do better: Divide into cases, based on whether
-                // b is above, below, or crossing 0.
-                auto position = (b.upper() >= 0.f) + 2 * (b.lower() <= 0.f);
-                switch (position)
-                {
-                case 1:
-                case 2:
-                {
-                    auto maxMagB = position == 1 ? b.upper() : -b.lower();
-                    auto minMagB = position == 1 ? b.lower() : -b.upper();
-                    auto highestQuotientB = a.upper() > 0 ? minMagB : maxMagB;
-                    auto lowestQuotientB = a.lower() < 0 ? maxMagB : minMagB;
-                    // Use std::floor to round to -INFINITY rather than to 0, 
-                    // in order to match the point evaluator behavior.
-                    auto highestQuotientInt = static_cast<int>
-                        (std::floor(a.upper() / highestQuotientB));
-                    auto lowestQuotientInt = static_cast<int>
-                        (std::floor(a.lower() / lowestQuotientB));
-                    if (highestQuotientInt == lowestQuotientInt)
-                    {
-                      out = { a.lower() - lowestQuotientInt * lowestQuotientB,
-                          a.upper() - highestQuotientInt * highestQuotientB };
-                    }
-                }
-                case 3:
-                    break;
-                case 0: //Can only happen if b is guaranteed NaN.
-                    out = Interval::I::empty();
-                    break;
-                default:
-                    assert(false);
-                }
-            }
-
-            SET_UNSAFE(a.upper() >= 0.f && a.lower() <= 0.f &&
-                       b.upper() >= 0.f && b.lower() <= 0.f);
-            break;
-        }
+            out = Interval::mod(a, b);
+            return;
         case Opcode::OP_NANFILL:
-            if (aN)
-            {
-                out = hull(a, b);
-                outN = bN;
-            }
-            else
-            {
-                out = a;
-                outN = false;
-            }
+            out = Interval::nanfill(a, b);
             break;
         case Opcode::OP_COMPARE:
-            if      (a.upper() < b.lower()) out = Interval::I(-1, -1);
-            else if (a.lower() > b.upper()) out = Interval::I( 1,  1);
-            else                            out = Interval::I(-1,  1);
-            outN = false;
+            out = Interval::compare(a, b);
             break;
 
         case Opcode::OP_SQUARE:
-            out = boost::numeric::square(a);
-            outN = aN;
+            out = Interval::square(a);
             break;
         case Opcode::OP_SQRT:
-            out = boost::numeric::sqrt(a);
-            outN = aN || a.lower() < 0.f;
+            out = Interval::sqrt(a);
             break;
         case Opcode::OP_NEG:
             out = -a;
-            outN = aN;
             break;
         case Opcode::OP_SIN:
-            out = boost::numeric::sin(a);
-            outN = aN;
+            out = Interval::sin(a);
             break;
         case Opcode::OP_COS:
-            out = boost::numeric::cos(a);
-            outN = aN;
+            out = Interval::cos(a);
             break;
         case Opcode::OP_TAN:
-            out = boost::numeric::tan(a);
-            outN = aN;
+            out = Interval::tan(a);
             break;
         case Opcode::OP_ASIN:
-            out = boost::numeric::asin(a);
-            outN = aN || a.lower() < -1.f || a.upper() > 1.f;
+            out = Interval::asin(a);
             break;
         case Opcode::OP_ACOS:
-            out = boost::numeric::acos(a);
-            outN = aN || a.lower() < -1.f || a.upper() > 1.f;
+            out = Interval::acos(a);
             break;
         case Opcode::OP_ATAN:
-            // If the interval has an infinite bound, then return the largest
-            // possible output interval (of +/- pi/2).  This rescues us from
-            // situations where we do atan(y / x) and the behavior of the
-            // interval changes if you're approaching x = 0 from below versus
-            // from above.
-            out = (std::isinf(a.lower()) || std::isinf(a.upper()))
-                ? Interval::I(-M_PI/2, M_PI/2)
-                : boost::numeric::atan(a);
-            outN = aN;
+            out = Interval::atan(a);
             break;
         case Opcode::OP_EXP:
-            out = boost::numeric::exp(a);
-            outN = aN;
+            out = Interval::exp(a);
             break;
         case Opcode::OP_LOG:
-            out = boost::numeric::log(a);
-            outN = aN || a.lower() < 0.f; // But exactly 0 is ok (returns -inf)
+            out = Interval::log(a);
             break;
         case Opcode::OP_ABS:
-            out = boost::numeric::abs(a);
-            outN = aN;
+            out = Interval::abs(a);
             break;
         case Opcode::OP_RECIP:
-            out = Interval::I(1,1) / a;
-            outN = aN; // The numerator can't be 0, so a 
-                       // denominator of 0 won't produce NaN.
+            out = Interval::recip(a);
             break;
 
         case Opcode::CONST_VAR:
             out = a;
-            outN = aN;
             break;
 
         case Opcode::ORACLE:
-            {   // We need a helper variable here because outN is
-                // a vector<bool> accessor class, not a bool itself.
-                bool nan(false);
-                deck->oracles[a_]->evalInterval(out, nan);
-                outN = nan;
-                break;
-            }
+            deck->oracles[a_]->evalInterval(out);
+            break;
 
         case Opcode::INVALID:
         case Opcode::CONSTANT:
@@ -470,10 +291,6 @@ void IntervalEvaluator::operator()(Opcode::Opcode op, Clause::Id id,
 #undef out
 #undef a
 #undef b
-#undef outN
-#undef aN
-#undef bN
-#undef nCond
 }
 
 }   // namespace libfive
