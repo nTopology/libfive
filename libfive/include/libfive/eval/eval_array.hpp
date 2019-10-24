@@ -69,7 +69,9 @@ protected:
     void setCount(size_t count);
 
     /*  v(clause, index) is a specific data point */
+public:
     Eigen::Array<float, Eigen::Dynamic, N, Eigen::RowMajor> v;
+protected:
 
     /*  ambig(index) returns whether a particular slot is ambiguous */
     Eigen::Array<bool, 1, N> ambig;

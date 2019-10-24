@@ -227,7 +227,7 @@ protected:
      *
      *  Stores the vertex in vert and returns the QEF error
      */
-    double findVertex(unsigned i=0);
+    double findVertex(unsigned i=0, const double *cornerVals=nullptr, int cornerCount=0);
 
     /*
      *  Writes the given intersection into the intersections list

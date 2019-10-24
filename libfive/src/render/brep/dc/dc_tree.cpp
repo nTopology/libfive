@@ -12,6 +12,12 @@ You can obtain one at http://mozilla.org/MPL/2.0/.
 #include <functional>
 #include <limits>
 
+#define NOMINMAX 1
+#define WIN32_LEAN_AND_MEAN 1
+#include <windows.h>
+#include <sstream>
+#include <fstream>
+
 #include <cmath>
 
 #include <Eigen/StdVector>
@@ -146,16 +152,16 @@ void DCTree<N>::evalLeaf(Evaluator* eval,
     for (uint8_t i=0; i < this->children.size(); ++i)
     {
         auto c = neighbors.check(i);
-        if (c == Interval::UNKNOWN)
+        //if (c == Interval::UNKNOWN)
         {
             pos.col(count) = this->region.corner3f(i);
             eval->set(pos.col(count), count);
             corner_indices[count++] = i;
         }
-        else
+        /*else
         {
             corners[i] = c;
-        }
+        }*/
     }
 
     // Evaluate the region's corners and check their states
@@ -175,6 +181,15 @@ void DCTree<N>::evalLeaf(Evaluator* eval,
     // or outside (so after the loop below, ambig(i) is only set if
     // pos[i] is both == 0 and ambiguous).
     auto ambig = eval->getAmbiguous(count, *tape);
+
+    double cornerValues[8] = { 0 };
+    for(uint8_t i = 0; i < count; ++i)
+    {
+      const double val = vs(i);
+      cornerValues[corner_indices[i]] = (!isnan(val)) ? val : 0.0f;
+
+      assert(!isnan(val) && !ambig(i));
+    }
 
     // This is a count of how many points there are that == 0
     // but are unambiguous; unambig_remap[z] returns the index
@@ -589,7 +604,7 @@ void DCTree<N>::evalLeaf(Evaluator* eval,
         // Find the vertex position, storing into the appropriate column
         // of the vertex array and ignoring the error result (because
         // this is the bottom of the recursion)
-        findVertex(this->leaf->vertex_count);
+        findVertex(this->leaf->vertex_count, cornerValues, count);
 
         // Move on to the next vertex
         this->leaf->vertex_count++;
@@ -809,9 +824,77 @@ bool DCTree<N>::collectChildren(Evaluator* eval,
 
 ////////////////////////////////////////////////////////////////////////////////
 
-template <unsigned N>
-double DCTree<N>::findVertex(unsigned index)
+template <typename T> int sgn(T val)
 {
+  return (T(0) < val) - (val < T(0));
+}
+
+#ifdef DC_TREE_2
+template <>
+double DCTree<2>::findVertex(unsigned index, const double *cornerVals, int cornerCount)
+{
+  static const unsigned int N = 2;
+  assert(this->leaf != nullptr);
+  Eigen::SelfAdjointEigenSolver<Eigen::Matrix<double, N, N>> es(
+    this->leaf->AtA);
+  assert(this->leaf->mass_point(N) > 0);
+
+  // We need to find the pseudo-inverse of AtA.
+  auto eigenvalues = es.eigenvalues().real();
+
+  // Truncate near-singular eigenvalues in the SVD's diagonal matrix
+  Eigen::Matrix<double, N, N> D = Eigen::Matrix<double, N, N>::Zero();
+#if LIBFIVE_UNNORMALIZED_DERIVS
+  auto highestVal = eigenvalues.lpNorm<Eigen::Infinity>();
+  if(highestVal > 1e-20)
+  {
+    auto cutoff = highestVal * EIGENVALUE_CUTOFF;
+    for(unsigned i = 0; i < N; ++i)
+    {
+      D.diagonal()[i] = (fabs(eigenvalues[i]) < cutoff)
+        ? 0 : (1 / eigenvalues[i]);
+    }
+  }
+#else
+  for(unsigned i = 0; i < N; ++i)
+  {
+    D.diagonal()[i] = (fabs(eigenvalues[i]) < EIGENVALUE_CUTOFF)
+      ? 0 : (1 / eigenvalues[i]);
+  }
+#endif
+
+  // Get rank from eigenvalues
+  if(!this->isBranch())
+  {
+    assert(index > 0 || this->leaf->rank == 0);
+    this->leaf->rank = D.diagonal().count();
+  }
+
+  // SVD matrices
+  auto U = es.eigenvectors().real().eval(); // = V
+
+  // Pseudo-inverse of A
+  auto AtAp = (U * D * U.transpose()).eval();
+
+  // Solve for vertex position (minimizing distance to center)
+  Vec center = this->leaf->mass_point.template head<N>() /
+    this->leaf->mass_point(N);
+
+  Vec v = AtAp * (this->leaf->AtB - (this->leaf->AtA * center)) + center;
+
+  // Store this specific vertex in the verts matrix
+  this->leaf->verts.col(index) = v;
+
+  // Return the QEF error
+  return (v.transpose() * this->leaf->AtA * v -
+    2*v.transpose() * this->leaf->AtB)[0]
+    + this->leaf->BtB;
+}
+#elif defined DC_TREE_3
+template <>
+double DCTree<3>::findVertex(unsigned index, const double *cornerVals, int cornerCount)
+{
+    static const unsigned int N = 3;
     assert(this->leaf != nullptr);
     Eigen::SelfAdjointEigenSolver<Eigen::Matrix<double, N, N>> es(
             this->leaf->AtA);
@@ -854,20 +937,79 @@ double DCTree<N>::findVertex(unsigned index)
     // Pseudo-inverse of A
     auto AtAp = (U * D * U.transpose()).eval();
 
+    const double v000 = cornerVals[0];
+    const double v001 = cornerVals[1];
+    const double v010 = cornerVals[2];
+    const double v011 = cornerVals[3];
+    const double v100 = cornerVals[4];
+    const double v101 = cornerVals[5];
+    const double v110 = cornerVals[6];
+    const double v111 = cornerVals[7];
+
+    auto Fcub = [=](const Eigen::Vector3d &p) -> double {
+      const double x = p.x(), y = p.y(), z = p.z();
+      return v000*(1-x)*(1-y)*(1-z) + v100*x*(1-y)*(1-z) + v010*(1-x)*y*(1-z)
+        + v001*(1-x)*(1-y)*z + v110*x*y*(1-z) + v011*(1-x)*y*z + v101*x*(1-y)*z
+        + v111*x*y*z;
+    };
+
+    auto DxFcub = [=](const Eigen::Vector3d &p) -> double {
+      const double x = p.x(), y = p.y(), z = p.z();
+      return v000*-(1-y)*(1-z) + v100*(1-y)*(1-z) + v010*-y*(1-z)
+        + v001*-(1-y)*z + v110*y*(1-z) + v011*-y*z + v101*(1-y)*z
+        + v111*y*z;
+    };
+
+    auto DyFcub = [=](const Eigen::Vector3d &p) -> double {
+      const double x = p.x(), y = p.y(), z = p.z();
+      return v000*-(1-x)*(1-z) + v100*-x*(1-z) + v010*(1-x)*(1-z)
+        + v001*-(1-x)*z + v110*x*(1-z) + v011*(1-x)*z + v101*-x*z
+        + v111*x*z;
+    };
+
+    auto DzFcub = [=](const Eigen::Vector3d &p) -> double {
+      const double x = p.x(), y = p.y(), z = p.z();
+      return v000*-(1-x)*(1-y) + v100*-x*(1-y) + v010*-(1-x)*y
+        + v001*(1-x)*(1-y) + v110*-x*y+ v011*(1-x)*y + v101*x*(1-y)
+        + v111*x*y;
+    };
+
+    auto GFcub = [=](const Eigen::Vector3d &p) -> Eigen::Vector3d {
+      return { DxFcub(p), DyFcub(p), DzFcub(p) };
+    };
+
     // Solve for vertex position (minimizing distance to center)
     Vec center = this->leaf->mass_point.template head<N>() /
                  this->leaf->mass_point(N);
+
+    double *centerP = center.data(), fc;
+    Eigen::Vector3d pnt = { centerP[0], centerP[1], centerP[2] };
+
+    while((fc=Fcub(pnt)) > std::numeric_limits<double>::epsilon())
+    {
+      Eigen::Vector3d gf = GFcub(pnt);
+      pnt -= sgn(fc) * gf.normalized();
+    }
+    
+    if(pnt.norm() > 0.5f || isnan(pnt.x()))
+    {
+      //__debugbreak();
+    }
+
+    Vec vPnt(pnt.x(), pnt.y(), pnt.z());
+    this->leaf->verts.col(index) = vPnt;
+
     Vec v = AtAp * (this->leaf->AtB - (this->leaf->AtA * center)) + center;
 
     // Store this specific vertex in the verts matrix
-    this->leaf->verts.col(index) = v;
+    //this->leaf->verts.col(index) = v;
 
     // Return the QEF error
     return (v.transpose() * this->leaf->AtA * v -
             2*v.transpose() * this->leaf->AtB)[0]
             + this->leaf->BtB;
 }
-
+#endif
 ////////////////////////////////////////////////////////////////////////////////
 
 template <unsigned N>
