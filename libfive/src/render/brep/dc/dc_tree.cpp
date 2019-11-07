@@ -984,11 +984,17 @@ double DCTree<3>::findVertex(unsigned index, const double *cornerVals, int corne
 
     double *centerP = center.data(), fc;
     Eigen::Vector3d pnt = { centerP[0], centerP[1], centerP[2] };
+    double fcPrev = std::numeric_limits<double>::max(); //largest positive finite value
+    double flip = 1.0;
 
     while((fc=Fcub(pnt)) > std::numeric_limits<double>::epsilon())
     {
       Eigen::Vector3d gf = GFcub(pnt);
-      pnt -= sgn(fc) * gf.normalized();
+
+      pnt -= flip * gf/10.0;  // This denominator needs tweaking for optimization
+      if(fabs(fc) > fabs(fcPrev))
+        flip *= -1.0;
+      fcPrev = fc;
     }
     
     if(pnt.norm() > 0.5f || isnan(pnt.x()))
