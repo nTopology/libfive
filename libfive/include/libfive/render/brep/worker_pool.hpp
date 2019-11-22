@@ -46,7 +46,8 @@ public:
     static Root<T> build(Evaluator* eval, const Region<N>& region,
                          const BRepSettings& settings);
 
-protected:
+    static Root<T> buildTbb(Tree t, const Region<N>& region, const BRepSettings& settings);
+
     struct Task {
         T* target;
         std::shared_ptr<Tape> tape;
@@ -54,6 +55,7 @@ protected:
         const VolTree* vol;
     };
 
+protected:
     using LockFreeStack =
         boost::lockfree::stack<Task, boost::lockfree::fixed_sized<true>>;
 
