@@ -91,12 +91,12 @@ else()
     endif()
 endif()
 
-if(NOT TARGET pngstatic)
+if(NOT TARGET PNG::PNG)
     find_package(PNG REQUIRED)
 endif()
 
-if(LIBFIVE_BUILD_WITH_TBB AND NOT TARGET tbb::tbb)
-    #TODO: find package for tbb
+if(LIBFIVE_BUILD_WITH_TBB AND NOT TARGET TBB::tbb)
+    find_package(TBB REQUIRED)
 endif()
 
 if (UNIX AND NOT(APPLE))

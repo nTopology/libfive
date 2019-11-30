@@ -126,7 +126,7 @@ target_include_directories(five PUBLIC
     ../include
 )
 
-set(LIBS Eigen3::Eigen pngstatic Boost::boost)
+set(LIBS Eigen3::Eigen PNG::PNG Boost::boost)
 
 if(UNIX AND NOT(APPLE))
     set(LIBS ${LIBS} ${CMAKE_THREAD_LIBS_INIT})
@@ -141,7 +141,7 @@ endif(UNIX)
 target_link_libraries(five ${LIBS})
 
 if(LIBFIVE_BUILD_WITH_TBB)
-    target_link_libraries(five tbb::tbb)
+    target_link_libraries(five TBB::tbb)
     target_compile_definitions(five PUBLIC FIVE_TBB) 
 endif()
 
