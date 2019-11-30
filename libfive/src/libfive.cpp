@@ -392,6 +392,9 @@ bool libfive_tree_save_mesh(libfive_tree tree, libfive_region3 R, float res, con
 
 bool libfive_evaluator_save_mesh(libfive_evaluator evaluator, libfive_region3 R, const char *f)
 {
+#if FIVE_TBB
+    return false;
+#else
     Region<3> region({R.X.lower, R.Y.lower, R.Z.lower},
                      {R.X.upper, R.Y.upper, R.Z.upper});
 
@@ -399,6 +402,7 @@ bool libfive_evaluator_save_mesh(libfive_evaluator evaluator, libfive_region3 R,
     settings.workers = 1;  // MOTE: temporay limitation
     auto ms = Mesh::render(evaluator, region, settings);
     return ms->saveSTL(f);
+#endif
 }
 
 bool libfive_tree_save_meshes(
