@@ -938,12 +938,13 @@ double DCTree<3>::findVertex(unsigned index, const double *cornerVals, int corne
     auto AtAp = (U * D * U.transpose()).eval();
 
     const double v000 = cornerVals[0];
-    const double v001 = cornerVals[1];
+    const double v001 = cornerVals[4];
     const double v010 = cornerVals[2];
-    const double v011 = cornerVals[3];
-    const double v100 = cornerVals[4];
+    const double v011 = cornerVals[6];
+
+    const double v100 = cornerVals[1];
     const double v101 = cornerVals[5];
-    const double v110 = cornerVals[6];
+    const double v110 = cornerVals[3];
     const double v111 = cornerVals[7];
 
     auto Fcub = [=](const Eigen::Vector3d &p) -> double {
@@ -985,27 +986,50 @@ double DCTree<3>::findVertex(unsigned index, const double *cornerVals, int corne
     double *centerP = center.data(), fc;
     Eigen::Vector3d pnt = { centerP[0], centerP[1], centerP[2] };
     double fcPrev = std::numeric_limits<double>::max(); //largest positive finite value
-    double flip = 1.0;
+    double sign = 1.0;
 
-    while((fc=Fcub(pnt)) > std::numeric_limits<double>::epsilon())
-    {
-      Eigen::Vector3d gf = GFcub(pnt);
+    using namespace std;
+    static std::mutex lock;
+    /*std::ostringstream ostr;
+    ostr << "vert--------------" << std::endl;
 
-      pnt -= flip * gf/10.0;  // This denominator needs tweaking for optimization
-      if(fabs(fc) > fabs(fcPrev))
-        flip *= -1.0;
-      fcPrev = fc;
-    }
-    
-    if(pnt.norm() > 0.5f || isnan(pnt.x()))
+    auto printy = [&ostr](const Eigen::Vector3d &p) {
+      ostr << p.x() << ", " << p.y() << ", " << p.z();
+    };
+
+    ostr << "starting at center: "; printy(pnt); ostr << endl;*/
+
+    constexpr double eps = std::numeric_limits<double>::epsilon();
+    constexpr double minNorm = 0.01;
+    const double deltaP = 0.05;
+    while((fc=fabs(Fcub(pnt))) > eps)
     {
-      //__debugbreak();
+      const Eigen::Vector3d gf = GFcub(pnt);
+      const double gfNorm = gf.norm();
+
+      if(gfNorm < minNorm)
+        break;
+
+      const Eigen::Vector3d pnt1 = pnt + deltaP*sign*(gf/gfNorm);
+      const double fc1 = fabs(Fcub(pnt1));
+
+      //ostr << "GFcub: "; printy(gf); ostr << endl;
+      //ostr << "sign: " << sign << endl;
+      //ostr << "delta: "; printy(sign * gf/10.0); ostr << endl;
+
+      if(fc < fabs(fc1))
+        sign *= -1.0;
+      pnt = pnt1;
+
+      //ostr << "pnt -> "; printy(pnt); ostr << endl;
     }
+
+    //ostr << "Final pos "; printy(pnt); ostr << endl;
 
     Vec vPnt(pnt.x(), pnt.y(), pnt.z());
     this->leaf->verts.col(index) = vPnt;
 
-    Vec v = AtAp * (this->leaf->AtB - (this->leaf->AtA * center)) + center;
+    /*Vec v = AtAp * (this->leaf->AtB - (this->leaf->AtA * center)) + center;
 
     // Store this specific vertex in the verts matrix
     //this->leaf->verts.col(index) = v;
@@ -1013,7 +1037,8 @@ double DCTree<3>::findVertex(unsigned index, const double *cornerVals, int corne
     // Return the QEF error
     return (v.transpose() * this->leaf->AtA * v -
             2*v.transpose() * this->leaf->AtB)[0]
-            + this->leaf->BtB;
+            + this->leaf->BtB;*/
+    return 0;
 }
 #endif
 ////////////////////////////////////////////////////////////////////////////////
