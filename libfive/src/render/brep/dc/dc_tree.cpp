@@ -990,14 +990,6 @@ double DCTree<3>::findVertex(unsigned index, const double *cornerVals, int corne
 
     using namespace std;
     static std::mutex lock;
-    /*std::ostringstream ostr;
-    ostr << "vert--------------" << std::endl;
-
-    auto printy = [&ostr](const Eigen::Vector3d &p) {
-      ostr << p.x() << ", " << p.y() << ", " << p.z();
-    };
-
-    ostr << "starting at center: "; printy(pnt); ostr << endl;*/
 
     constexpr double eps = std::numeric_limits<double>::epsilon();
     constexpr double minNorm = 0.01;
@@ -1013,18 +1005,10 @@ double DCTree<3>::findVertex(unsigned index, const double *cornerVals, int corne
       const Eigen::Vector3d pnt1 = pnt + deltaP*sign*(gf/gfNorm);
       const double fc1 = fabs(Fcub(pnt1));
 
-      //ostr << "GFcub: "; printy(gf); ostr << endl;
-      //ostr << "sign: " << sign << endl;
-      //ostr << "delta: "; printy(sign * gf/10.0); ostr << endl;
-
       if(fc < fabs(fc1))
         sign *= -1.0;
       pnt = pnt1;
-
-      //ostr << "pnt -> "; printy(pnt); ostr << endl;
     }
-
-    //ostr << "Final pos "; printy(pnt); ostr << endl;
 
     Vec vPnt(pnt.x(), pnt.y(), pnt.z());
     this->leaf->verts.col(index) = vPnt;
