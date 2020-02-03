@@ -17,13 +17,13 @@ You can obtain one at http://mozilla.org/MPL/2.0/.
 namespace libfive {
 
 // Forward declaration
-template <unsigned N> class SimplexTree;
+template <unsigned N, class Leaf> class SimplexTree;
 template <unsigned N> struct SimplexLeaf;
 template <unsigned N> struct SimplexLeafSubspace;
 
-template <unsigned N>
+template <unsigned N, class Leaf = SimplexLeaf<N>>
 class SimplexNeighbors :
-    public Neighbors<N, SimplexTree<N>, SimplexNeighbors<N>>
+    public Neighbors<N, SimplexTree<N, Leaf>, SimplexNeighbors<N, Leaf>>
 {
 public:
     /*
@@ -61,7 +61,7 @@ public:
      *  by any of the neighbors, returning FILLED / EMPTY if that is the case
      *  and UNKNOWN otherwise.
      */
-    std::pair<const SimplexLeaf<N>*, NeighborIndex> check(NeighborIndex i) const;
+    std::pair<const Leaf*, NeighborIndex> check(NeighborIndex i) const;
 };
 
 }   // namespace libfive

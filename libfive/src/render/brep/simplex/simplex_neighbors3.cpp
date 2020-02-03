@@ -11,8 +11,8 @@ You can obtain one at http://mozilla.org/MPL/2.0/.
 #include "simplex_neighbors.inl"
 
 namespace libfive {
-template class Neighbors<3, SimplexTree<3>, SimplexNeighbors<3>>;
-template class SimplexNeighbors<3>;
+template class Neighbors<3, SimplexTree<3, SimplexLeaf<3>>, SimplexNeighbors<3, SimplexLeaf<3>>>;
+template class SimplexNeighbors<3, SimplexLeaf<3>>;
 }   // namespace libfive
 
 
