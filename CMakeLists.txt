@@ -81,19 +81,12 @@ endif()
 
 ################################################################################
 # Find all packages here at the top level so we can print debugging info
-if(NOT MSVC)
-    if (BUILD_STUDIO_APP)
-        find_package(Qt5Core)
-    endif ()
-    if(NOT TARGET Eigen3::Eigen)
-        find_package(PkgConfig REQUIRED)
-        pkg_check_modules(GUILE guile-2.2>=2.2.1)
-        pkg_check_modules(EIGEN REQUIRED eigen3>=3.2.92)
-    endif()
-else()
-    if(NOT TARGET Eigen3::Eigen)
-        find_package(Eigen REQUIRED)
-    endif()
+if (BUILD_STUDIO_APP)
+    find_package(Qt5Core)
+endif ()
+
+if(NOT TARGET Eigen3::Eigen)
+    find_package(Eigen3 REQUIRED)
 endif()
 
 if(NOT TARGET Boost::boost)
@@ -115,6 +108,8 @@ message("Checking dependencies:")
 message("  libfive:		✓")
 
 if (BUILD_GUILE_BINDINGS)
+  find_package(PkgConfig REQUIRED)
+  pkg_check_modules(GUILE guile-2.2>=2.2.1)
   if (GUILE_FOUND)
     message("  libfive-guile:	✓")
 
