@@ -13,6 +13,7 @@ You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include "libfive/eval/interval.hpp"
 #include "libfive/render/brep/region.hpp"
+#include "libfive/render/brep/indexes.hpp"
 
 namespace libfive {
 
@@ -43,6 +44,7 @@ public:
      *  Looks up a child, returning *this if this isn't a branch
      */
     const T* child(unsigned i) const;
+    T* child(unsigned i);
 
     /*
      *  Walks the tree, resetting pending to its initial value of (1 << N) - 1
@@ -53,6 +55,15 @@ public:
      *  Sets type and calls done()
      */
     void setType(Interval::State t);
+
+    /*  Neighbor at the given neighbor index.  If there is no neighbor (this is
+     *  on the border of the root region), nullptr is returned.  Will go to a
+     *  higher level if necessary (the neighbor is merged), but never to a lower
+     *  level (even for a corner neighbor).  Should only be called on a fully 
+     *  built tree.*/
+    const T* neighbor(NeighborIndex neighbor) const;
+
+    T* neighbor(NeighborIndex neighbor);
 
     /*  Parent tree, or nullptr if this is the root */
     T* parent;
@@ -98,5 +109,13 @@ protected:
      */
     bool done();
 };
+
+
+template <unsigned N, typename T, typename L>
+inline
+const T* XTree<N, T, L>::neighbor(NeighborIndex neighbor) const
+{
+    return const_cast<XTree<N, T, L>*>(this)->neighbor(neighbor);
+}
 
 }   // namespace libfive

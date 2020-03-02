@@ -37,7 +37,7 @@ std::unique_ptr<VolTree> VolTree::empty()
 
 Tape::Handle VolTree::evalInterval(Evaluator* eval,
                                    const Tape::Handle& tape,
-                                   Pool&)
+                                   Pool&, const BRepSettings&)
 {
     // Do a preliminary evaluation to prune the tree, storing the interval
     // result and an handle to the pushed tape (which we'll use when recursing)
@@ -66,7 +66,7 @@ Tape::Handle VolTree::evalInterval(Evaluator* eval,
 
 void VolTree::evalLeaf(Evaluator* eval,
                        const Tape::Handle& tape,
-                       Pool&, const VolNeighbors&)
+                       Pool&, const VolNeighbors&, const BRepSettings&)
 {
     // Do a preliminary evaluation to prune the tree, storing the interval
     // result and an handle to the pushed tape (which we'll use when recursing)
@@ -95,7 +95,7 @@ void VolTree::evalLeaf(Evaluator* eval,
 bool VolTree::collectChildren(Evaluator*,
                               const Tape::Handle&,
                               Pool& object_pool,
-                              double)
+                              const BRepSettings&)
 {
     // Wait for collectChildren to have been called N times
     if (this->pending-- != 0)

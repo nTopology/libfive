@@ -25,6 +25,7 @@ You can obtain one at http://mozilla.org/MPL/2.0/.
 #include "libfive/render/brep/dc/dc_neighbors.hpp"
 #include "libfive/render/brep/dc/dc_flags.hpp"
 #include "libfive/render/brep/region.hpp"
+#include "libfive/render/brep/settings.hpp"
 #include "libfive/render/axes.hpp"
 
 #include "../xtree.inl"
@@ -93,7 +94,7 @@ void DCLeaf<N>::reset()
 template <unsigned N>
 Tape::Handle DCTree<N>::evalInterval(Evaluator* eval,
                                      const Tape::Handle& tape,
-                                     Pool& pool)
+                                     Pool& pool, const BRepSettings&)
 {
     // Do a preliminary evaluation to prune the tree, storing the interval
     // result and an handle to the pushed tape (which we'll use when recursing)
@@ -131,7 +132,7 @@ template <unsigned N>
 void DCTree<N>::evalLeaf(Evaluator* eval,
                         const Tape::Handle& tape,
                         Pool& object_pool,
-                        const DCNeighbors<N>& neighbors)
+                        const DCNeighbors<N>& neighbors, const BRepSettings&)
 {
     // Track how many corners have to be evaluated here
     // (if they can be looked up from a neighbor, they don't have
@@ -580,8 +581,8 @@ uint8_t DCTree<N>::buildCornerMask(
 template <unsigned N>
 bool DCTree<N>::collectChildren(Evaluator* eval,
                                 const Tape::Handle& tape,
-                                Pool& object_pool,
-                                double max_err)
+                                Pool& object_pool, 
+                                const BRepSettings& settings)
 {
     // Wait for collectChildren to have been called N times
     if (this->pending-- != 0)
@@ -703,6 +704,7 @@ bool DCTree<N>::collectChildren(Evaluator* eval,
     // a leaf by erasing all of the child branches
     {
         bool collapsed = false;
+        auto max_err = settings.max_err;
 #if LIBFIVE_LINEAR_ERROR
         if (findVertex(this->leaf->vertex_count++) < max_err * max_err &&
 #else

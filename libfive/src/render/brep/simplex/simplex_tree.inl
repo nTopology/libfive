@@ -34,13 +34,13 @@ namespace libfive {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-template <unsigned N>
+template<unsigned N>
 SimplexLeafSubspace<N>::SimplexLeafSubspace()
 {
     reset();
 }
 
-template <unsigned N>
+template<unsigned N>
 void SimplexLeafSubspace<N>::reset()
 {
     inside = false;
@@ -52,13 +52,13 @@ void SimplexLeafSubspace<N>::reset()
 
 ////////////////////////////////////////////////////////////////////////////////
 
-template <unsigned N>
+template<unsigned N>
 SimplexLeaf<N>::SimplexLeaf()
 {
     reset();
 }
 
-template <unsigned N>
+template<unsigned N>
 void SimplexLeaf<N>::reset()
 {
     level = 0;
@@ -67,7 +67,7 @@ void SimplexLeaf<N>::reset()
     surface.clear();
 }
 
-template <unsigned N>
+template<unsigned N>
 void SimplexLeaf<N>::releaseTo(Pool& object_pool)
 {
     for (auto& s : sub) {
@@ -89,13 +89,15 @@ struct Unroller
      *  Statically unrolls a loop to position each subspace's vertex,
      *  return the maximum error from the QEF solver.
      */
+    template <class Leaf>
     double operator()(
-            SimplexLeaf<BaseDimension>& leaf,
+            Leaf& leaf,
             const std::array<SimplexLeafSubspace<BaseDimension>*,
                        ipow(3, BaseDimension)>& leaf_sub,
             const std::array<bool, ipow(3, BaseDimension)>& already_solved,
             const Region<BaseDimension>& region,
-            Evaluator* eval, const Tape::Handle& tape)
+            Evaluator* eval, const Tape::Handle& tape,
+            double boundCutoff)
     {
         double error = 0.0;
         if (!already_solved[SubspaceIndex_]) {
@@ -122,10 +124,10 @@ struct Unroller
 #ifdef LIBFIVE_SIMPLEX_DC
                 sol = qef.solveDC(r.center());
                 if (!r.contains(sol.position, 0)) {
-                    sol = qef.solveBounded(r);
+                    sol = qef.solveBounded(r, Leaf::qefShrink, boundCutoff);
                 }
 #else
-                sol = qef.solveBounded(r);
+                sol = qef.solveBounded(r, Leaf::qefShrink, boundCutoff);
 #endif
 
                 if (i == 0) {
@@ -164,7 +166,7 @@ struct Unroller
         return std::max(error,
                 Unroller<BaseDimension, SubspaceIndex_ - 1>()(
                     leaf, leaf_sub, already_solved, region,
-                    eval, tape));
+                    eval, tape, boundCutoff));
     }
 };
 
@@ -172,12 +174,13 @@ struct Unroller
 template <unsigned BaseDimension>
 struct Unroller<BaseDimension, -1>
 {
-    double operator()(SimplexLeaf<BaseDimension>&,
+    template <class Leaf>
+    double operator()(Leaf&,
                       const std::array<SimplexLeafSubspace<BaseDimension>*,
                                  ipow(3, BaseDimension)>&,
                       const std::array<bool, ipow(3, BaseDimension)>&,
                       const Region<BaseDimension>&,
-                      Evaluator*, const Tape::Handle&)
+                      Evaluator*, const Tape::Handle&, double)
     {
         return 0.0; // Nothing to do here
     }
@@ -185,23 +188,23 @@ struct Unroller<BaseDimension, -1>
 
 ////////////////////////////////////////////////////////////////////////////////
 
-template <unsigned N>
-SimplexTree<N>::SimplexTree(SimplexTree<N>* parent, unsigned index,
+template<unsigned N, class Leaf>
+SimplexTree<N, Leaf>::SimplexTree(SimplexTree<N, Leaf>* parent, unsigned index,
                             const Region<N>& region)
-    : XTree<N, SimplexTree<N>, SimplexLeaf<N>>(parent, index, region)
+    : XTree<N, SimplexTree<N, Leaf>, Leaf>(parent, index, region)
 {
     // Nothing to do here
 }
 
-template <unsigned N>
-SimplexTree<N>::SimplexTree()
-    : XTree<N, SimplexTree<N>, SimplexLeaf<N>>()
+template<unsigned N, class Leaf>
+SimplexTree<N, Leaf>::SimplexTree()
+    : XTree<N, SimplexTree<N, Leaf>, Leaf>()
 {
     // Nothing to do here
 }
 
-template <unsigned N>
-std::unique_ptr<SimplexTree<N>> SimplexTree<N>::empty()
+template<unsigned N, class Leaf>
+std::unique_ptr<SimplexTree<N, Leaf>> SimplexTree<N, Leaf>::empty()
 {
     std::unique_ptr<SimplexTree> t(new SimplexTree);
     t->type = Interval::UNKNOWN;
@@ -210,15 +213,16 @@ std::unique_ptr<SimplexTree<N>> SimplexTree<N>::empty()
     // never be used (and if someone uses it by accident, we want to
     // crash quickly and with an obviously-wrong value).
     uintptr_t flag_ptr = 0xDEADBEEF;
-    t->parent = reinterpret_cast<SimplexTree<N>*>(flag_ptr);
+    t->parent = reinterpret_cast<SimplexTree<N, Leaf>*>(flag_ptr);
 
     return t;
 }
 
-template <unsigned N>
-Tape::Handle SimplexTree<N>::evalInterval(Evaluator* eval,
+template<unsigned N, class Leaf>
+Tape::Handle SimplexTree<N, Leaf>::evalInterval(Evaluator* eval,
                                           const Tape::Handle& tape,
-                                          Pool& object_pool)
+                                          Pool& object_pool,
+                                          const BRepSettings& settings)
 {
     // Do a preliminary evaluation to prune the tree, storing the interval
     // result and an handle to the pushed tape (which we'll use when recursing)
@@ -236,11 +240,12 @@ Tape::Handle SimplexTree<N>::evalInterval(Evaluator* eval,
 
     if (this->type == Interval::FILLED || this->type == Interval::EMPTY)
     {
-        SimplexNeighbors<N> neighbors;
+        SimplexNeighbors<N, Leaf> neighbors;
 
         this->leaf = object_pool.next().get();
+        //this->leaf->tape = o.second;
         this->leaf->level = this->region.level;
-        findLeafVertices(eval, tape, object_pool, neighbors);
+        findLeafVertices(eval, o.second, object_pool, neighbors, settings);
         this->done();
     }
     return o.second;
@@ -248,12 +253,13 @@ Tape::Handle SimplexTree<N>::evalInterval(Evaluator* eval,
 
 ////////////////////////////////////////////////////////////////////////////////
 
-template <unsigned N>
-void SimplexTree<N>::findLeafVertices(
+template<unsigned N, class Leaf>
+void SimplexTree<N, Leaf>::findLeafVertices(
         Evaluator* eval,
         const Tape::Handle& tape,
         Pool& object_pool,
-        const SimplexNeighbors<N>& neighbors)
+        const SimplexNeighbors<N, Leaf>& neighbors,
+        const BRepSettings& settings)
 {
     assert(this->leaf != nullptr);
 
@@ -399,8 +405,9 @@ void SimplexTree<N>::findLeafVertices(
     }
 
     // Statically unroll a loop to position every vertex within their subspace.
-    Unroller<N, ipow(3, N) - 1>()(*this->leaf, leaf_sub,
-                                  already_solved, this->region, eval, tape);
+    Unroller<N, ipow(3, N) - 1>()(*this->leaf, leaf_sub, already_solved, 
+                                  this->region, eval, tape, 
+                                  settings.simplex_bounding_eigenvalue_cutoff);
 
 
     // Check whether each vertex is inside or outside, either the hard way
@@ -416,11 +423,12 @@ void SimplexTree<N>::findLeafVertices(
     }
 }
 
-template <unsigned N>
-void SimplexTree<N>::evalLeaf(Evaluator* eval,
+template<unsigned N, class Leaf>
+void SimplexTree<N, Leaf>::evalLeaf(Evaluator* eval,
                               const std::shared_ptr<Tape>& tape,
                               Pool& object_pool,
-                              const SimplexNeighbors<N>& neighbors)
+                              const SimplexNeighbors<N, Leaf>& neighbors,
+                              const BRepSettings& settings)
 {
     this->leaf = object_pool.next().get();
     this->leaf->tape = tape;
@@ -430,7 +438,7 @@ void SimplexTree<N>::evalLeaf(Evaluator* eval,
     // Build the corner-subspace QEFs by sampling the function at the corners,
     // then solve for vertex position.
     this->type = Interval::AMBIGUOUS;
-    findLeafVertices(eval, tape, object_pool, neighbors);
+    findLeafVertices(eval, tape, object_pool, neighbors, settings);
     checkVertexSigns();
 
     // We need to keep the leaf + QEF data, even if the region is completely
@@ -440,11 +448,11 @@ void SimplexTree<N>::evalLeaf(Evaluator* eval,
     this->done();
 }
 
-template <unsigned N>
-bool SimplexTree<N>::collectChildren(Evaluator* eval,
-                                     const Tape::Handle& tape,
-                                     Pool& object_pool,
-                                     double max_err)
+template<unsigned N, class Leaf>
+bool SimplexTree<N, Leaf>::collectChildren(Evaluator* eval,
+                                           const Tape::Handle& tape,
+                                           Pool& object_pool,
+                                           const BRepSettings& settings)
 {
     // Wait for collectChildren to have been called N times
     if (this->pending-- != 0)
@@ -453,7 +461,7 @@ bool SimplexTree<N>::collectChildren(Evaluator* eval,
     }
 
     // Make a copy of the children pointers here, to avoid atomics
-    std::array<SimplexTree<N>*, 1 << N> cs;
+    RawChildArray cs;
     for (unsigned i=0; i < this->children.size(); ++i)
     {
         cs[i] = this->children[i].load(std::memory_order_relaxed);
@@ -462,7 +470,7 @@ bool SimplexTree<N>::collectChildren(Evaluator* eval,
     // If any children are branches, then we can't collapse.
     // We do this check first, to avoid allocating then freeing a Leaf
     if (std::any_of(cs.begin(), cs.end(),
-                    [](SimplexTree<N>* o){ return o->isBranch(); }))
+                    [](SimplexTree<N, Leaf>* o){ return o->isBranch(); }))
     {
         this->done();
         return true;
@@ -502,8 +510,8 @@ bool SimplexTree<N>::collectChildren(Evaluator* eval,
         this->releaseChildren(object_pool);
         assert(!this->isBranch());
 
-        SimplexNeighbors<N> neighbors;
-        findLeafVertices(eval, tape, object_pool, neighbors);
+        SimplexNeighbors<N, Leaf> neighbors;
+        findLeafVertices(eval, tape, object_pool, neighbors, settings);
         this->done();
 
         return true;
@@ -533,13 +541,19 @@ bool SimplexTree<N>::collectChildren(Evaluator* eval,
     std::fill(already_solved.begin(), already_solved.end(), false);
     const double err = Unroller<N, ipow(3, N) - 1>()(
             *this->leaf, leaf_sub, already_solved, this->region,
-            eval, tape);
+            eval, tape, settings.simplex_bounding_eigenvalue_cutoff);
 
-    // We've successfully collapsed the cell!
-    if (err < max_err) {
-        // Calculate and save vertex inside/outside states
+    // Now that we've populated our subspace data, we can check whether
+    // it is topologically safe to collapse.  If it is, and the error is
+    // small enough, then we've successfully collapsed the cell!
+    auto toCollapse = err < settings.max_err;
+    if (toCollapse) {
+        // Calculate and save vertex inside/outside states; this must be
+        // done before checking if it's collapsible.
         saveVertexSigns(eval, tape, already_solved);
-
+        toCollapse = isCollapsible(cs);
+    }
+    if (toCollapse) {
         // Convert to EMPTY / FILLED if unambiguous
         checkVertexSigns();
 
@@ -558,10 +572,10 @@ bool SimplexTree<N>::collectChildren(Evaluator* eval,
     return true;
 }
 
-template <unsigned N>
-void SimplexTree<N>::saveVertexSigns(
+template<unsigned N, class Leaf>
+void SimplexTree<N, Leaf>::saveVertexSigns(
         Evaluator* eval, const Tape::Handle& tape,
-        const std::array<bool, ipow(3, N)>& already_solved)
+        const std::array<bool, N == 2 ? 9 : 27>& already_solved)
 {
     // With every vertex positioned, solve for whether it is inside or outside.
     assert(this->leaf != nullptr);
@@ -615,8 +629,8 @@ void SimplexTree<N>::saveVertexSigns(
     }
 }
 
-template <unsigned N>
-void SimplexTree<N>::checkVertexSigns() {
+template<unsigned N, class Leaf>
+void SimplexTree<N, Leaf>::checkVertexSigns() {
     // Check all subspace vertices to decide whether this leaf is
     // completely empty or full.  This isn't as conclusive as the
     // interval arithmetic, but if there were parts of the model
@@ -643,9 +657,9 @@ void SimplexTree<N>::checkVertexSigns() {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-template <unsigned N>
+template<unsigned N, class Leaf>
 std::array<SimplexLeafSubspace<N>*, ipow(3, N)>
-SimplexTree<N>::getLeafSubs() const
+SimplexTree<N, Leaf>::getLeafSubs() const
 {
     std::array<SimplexLeafSubspace<N>*, ipow(3, N)> out;
     for (unsigned i=0; i < out.size(); ++i) {
@@ -654,8 +668,402 @@ SimplexTree<N>::getLeafSubs() const
     return out;
 }
 
-template <unsigned N>
-uint32_t SimplexTree<N>::leafLevel() const
+template<unsigned N, class Leaf>
+bool SimplexTree<N, Leaf>::isCollapsible(const RawChildArray& children)
+{
+    ChildSubArray<N> childSubsInside;
+    for (auto childIdx = 0; childIdx < children.size(); ++childIdx) {
+        const auto& child = *children[childIdx];
+        for (auto subIdx = 0; subIdx < child.leaf->sub.size(); ++subIdx) {
+            const auto& sub = child.leaf->sub[subIdx];
+            std::array<int, N> index;
+            bool isValid = true;
+            auto pos = NeighborIndex(subIdx).pos();
+            auto floating = NeighborIndex(subIdx).floating();
+            for (auto i = 0; i < N; ++i) {
+                auto mask = 1 << i;
+                if (childIdx & mask) {
+                    // Upper child
+                    if (floating & mask) {
+                        index[i] = 3;
+                    }
+                    else if (pos & mask) {
+                        index[i] = 4;
+                    }
+                    else {
+                        // This sub is already handled via the lower child.
+                        isValid = false;
+                        break;
+                    }
+                }
+                else {
+                    if (floating & mask) {
+                        index[i] = 1;
+                    }
+                    else if (pos & mask) {
+                        index[i] = 2;
+                    }
+                    else {
+                        index[i] = 0;
+                    }
+                }
+            }
+            if (isValid) {
+                childSubsInside[index] = sub.load()->inside;
+            }
+        }
+    }
+
+    for (auto i = 0; i < this->leaf->sub.size(); ++i) {
+        if (!subIsCollapsible(i, childSubsInside)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+template<unsigned N, class Leaf>
+inline bool SimplexTree<N, Leaf>::subIsCollapsible(
+    unsigned subIndex, const ChildSubArray<N>& childSubsInside)
+{
+    if (NeighborIndex(subIndex).dimension() == 0) {
+        return true;
+    }
+    auto pos = NeighborIndex(subIndex).pos();
+    auto floating = NeighborIndex(subIndex).floating();
+    auto centerInside = this->leaf->sub[subIndex].load()->inside;
+    // Our basic approach is to determine connected components via DFS.  The
+    // only complication here is that the topology of our graph contains some
+    // diagonal connections and not others; in particular, it contains only
+    // those connections in which all changing index elements have the same
+    // parity (as that means it is either going from floating to fixed in all
+    // of them, or vice versa).  
+    auto hasNeighborInDirection = 
+        [](std::array<int, N> idx, int direction, std::array<int, N>& newIdx) {
+        auto parityCheck = 0;
+        auto dirFloat = NeighborIndex(direction).floating();
+        auto dirPos = NeighborIndex(direction).pos();
+        newIdx = idx;
+        for (auto i = 0; i < N; ++i) {
+            auto mask = 1 << i;
+            if (!(dirFloat & mask)) {
+                if (idx[i] & 1) {
+                    parityCheck |= 2;
+                }
+                else {
+                    parityCheck |= 1;
+                }
+                if (parityCheck == 3) {
+                    return false;
+                }
+                if (dirPos & mask) {
+                    ++newIdx[i];
+                    if (newIdx[i] > 4) {
+                        return false;
+                    }
+                }
+                else {
+                    --newIdx[i];
+                    if (newIdx[i] < 0) {
+                        return false;
+                    }
+                }
+            }
+        }
+        return true;
+    };
+    // We use another ChildSubArray to track which subspaces are left to check;
+    // this is tracking not only which have been visited, but also which are
+    // not in the subspace we're checking in the first place.
+    ChildSubArray<N> remaining;
+    for (auto rawIdx = 0; rawIdx < ipow(5, N); ++rawIdx) {
+        std::array<int, N> idx;
+        auto rawCopy = rawIdx;
+        auto toStore = true;
+        for (auto i = 0; i < N; ++i) {
+            idx[i] = rawCopy % 5;
+            rawCopy /= 5;
+            if (toStore && !(floating & (1 << i))) {
+                switch (idx[i]) {
+                case 0:
+                    if (pos & (1 << i)) {
+                        toStore = false;
+                    }
+                    break;
+                case 1:
+                case 2:
+                case 3:
+                    toStore = false;
+                    break;
+                case 4:
+                    if (!(pos & (1 << i))) {
+                        toStore = false;
+                    }
+                    break;
+                default:
+                    assert(false);
+                    return false;
+                }
+            }
+        }
+        remaining[idx] = toStore;
+    }
+
+    // We need the connected components of the merged array.
+    std::array<int, ipow(3, N)> mergedComponents;
+    // We use -2 for "not visited", -1 for the component containing the center
+    // and for anything not contained in subIndex, and nonnegative values for
+    // other components.
+    std::fill(mergedComponents.begin(), mergedComponents.end(), -2);
+    mergedComponents.back() = -1;
+    auto nextComponent = 0;
+    for (auto idx = 0; idx < mergedComponents.size() - 1; ++idx) {
+        if (mergedComponents[idx] != -2) {
+            continue;
+        }
+        if (!NeighborIndex(subIndex).contains(NeighborIndex(idx)) ||
+            centerInside == this->leaf->sub[idx].load()->inside) {
+            mergedComponents[idx] = -1;
+            continue;
+        }
+        boost::container::static_vector<int, ipow(3, N) - 1> toDo;
+        toDo.push_back(idx);
+        auto thisComponent = nextComponent++;
+        mergedComponents[thisComponent] = thisComponent;
+        while (!toDo.empty()) {
+            auto fillIndex = toDo.back();
+            toDo.pop_back();
+            auto idxFloat = NeighborIndex(fillIndex).floating();
+            auto idxPos = NeighborIndex(fillIndex).pos();
+            for (auto dir = 0; dir < ipow(3, N) - 1; ++dir) {
+                auto isValid = true;
+                auto dirFloat = NeighborIndex(dir).floating();
+                auto dirPos = NeighborIndex(dir).pos();
+                if (((1 << N) - 1) & ~dirFloat & ~floating) {
+                    // This direction will move out of the subspace.
+                    continue;
+                }
+                if (((1 << N) - 1) & ~dirFloat & ~(dirPos ^ idxPos)) {
+                    // This direction will move past the cell boundaries.
+                }
+                auto newPos = idxPos | dirPos;
+                auto newFloat = ((dirPos ^ idxPos) & ~dirFloat & ~idxFloat) | 
+                    (dirFloat & idxFloat);
+                auto newIdx = NeighborIndex::fromPosAndFloating(
+                    newPos, newFloat).i;
+                if (mergedComponents[newIdx] != -2) {
+                    assert(mergedComponents[newIdx] == -1 ||
+                           mergedComponents[newIdx] == thisComponent);
+                    continue;
+                }
+                if (centerInside == this->leaf->sub[idx].load()->inside) {
+                    mergedComponents[newIdx] = -1;
+                    continue;
+                }
+                mergedComponents[newIdx] = thisComponent;
+                toDo.push_back(newIdx);
+            }
+        }
+    }
+    auto matchingCenterFound = false;
+    for (auto rawIdx = 0; rawIdx < ipow(5, N); ++rawIdx) {
+        std::array<int, N> idx;
+        auto rawCopy = rawIdx;
+        for (auto i = 0; i < N; ++i) {
+            idx[i] = rawCopy % 5;
+            rawCopy /= 5;
+        }
+
+        // We always check and clear remaining[idx] before pushing to toDo, in
+        // order to ensure it doesn't have any duplicates and thus doesn't go
+        // past capacity.
+        if (!remaining[idx]) {
+            continue;
+        }
+        remaining[idx] = false;
+
+        // If it hasn't been visited and is in the subspace, it's a new
+        // connected component.
+        auto componentInside = childSubsInside[idx];
+        if (componentInside == centerInside) {
+            // We are limited to one component matching the center; if there
+            // are two, then we necessarily are changing the topology.
+            if (matchingCenterFound) {
+                return false;
+            }
+            else {
+                matchingCenterFound = true;
+            }
+        }
+
+        boost::container::static_vector<decltype(idx), ipow(5, N)> toDo;
+        toDo.push_back(idx);
+        auto reachedBorder = -1;
+        while (!toDo.empty()) {
+            idx = toDo.back();
+            toDo.pop_back();
+            if (componentInside != centerInside) {
+                auto lowBorderReached = 0;
+                auto highBorderReached = 0;
+                for (auto i = 0; i < N; ++i) {
+                    if (idx[i] == 0) {
+                        lowBorderReached |= (1 << i);
+                    }
+                    else if (idx[i] == 4) {
+                        highBorderReached |= (1 << i);
+                    }
+                }
+                assert((lowBorderReached & highBorderReached) == 0);
+                for (auto i = 0; i < (1 << N); ++i) {
+                    // Check if we reached a subspace that is fixed for i.
+                    if (i & ~lowBorderReached & ~highBorderReached) {
+                        continue;
+                    }
+                    auto reached = NeighborIndex::fromPosAndFloating(
+                        highBorderReached, ((1 << N) - 1) & ~i).i;
+                    auto reachedNow = mergedComponents[reached];
+                    assert(reachedNow != -2);
+                    if (reachedNow != -1) {
+                        if (reachedBorder == -1) {
+                            reachedBorder = reachedNow;
+                        }
+                        else if (reachedBorder != reachedNow) {
+                            // We're connecting two border components that are
+                            // separate when the cell is merged.
+                            return false;
+                        }
+                    }
+                }
+            }
+            // Now to propagate.
+            for (auto direction = 0; direction < ipow(3, N) - 1; ++direction) {
+                std::array<int, N> newIdx;
+                if (hasNeighborInDirection(idx, direction, newIdx) &&
+                    remaining[newIdx] && 
+                    componentInside == childSubsInside[newIdx]) {
+                    remaining[newIdx] = false;
+                    toDo.push_back(newIdx);
+                }
+            }
+        }
+        if (componentInside != centerInside && reachedBorder == -1) {
+            return false;
+        }
+    }
+    if (!matchingCenterFound) {
+        return false;
+    }
+    // At this point, in two or fewer dimensions, we're done.  In three
+    // dimensions, we have only one more thing to test: If the (single)
+    // connected subcomponent matching the center has any noncontractible
+    // loops, it is not safe to merge; if it does not, it is.
+    if constexpr (N == 2) {
+        return true;
+    }
+    else if (subIndex != 26) {
+        return true;
+    }
+    else {
+        // For now, we'll test contractibility by trying to find vertices
+        // that can be merged into neighbors; a vertex can be merged into
+        // a neighbor that shares all of its other neighbors (discounting
+        // those that are not parts of the subcomponent).  This algorithm
+        // can in theory take up to 125^2 iterations of the innermost loop,
+        // but in practice is likely to be much faster, as well as only being
+        // called when everything else has failed to be conclusive.
+        auto component = childSubsInside;
+        if (!centerInside) {
+            component.flip();
+        }
+        auto lowBound = 0;
+        auto highBound = 125;
+        while (true) {
+            auto newHighBound = lowBound;
+            auto madeChange = false;
+            for (auto rawIdx = lowBound; rawIdx < highBound; ++rawIdx) {
+                std::array<int, N> idx;
+                auto rawCopy = rawIdx;
+                for (auto i = 0; i < N; ++i) {
+                    idx[i] = rawCopy % 5;
+                    rawCopy /= 5;
+                }
+                if (component[idx]) {
+                    auto foundCollapsible = false;
+                    for (auto direction = 0; direction < 26; ++direction) {
+                        std::array<int, 3> neighbor;
+                        if (!hasNeighborInDirection(idx, direction, neighbor) ||
+                            !component[neighbor]) {
+                            // We have no active neighbor in this 
+                            // direction to check.
+                            continue;
+                        }
+                        auto collapsibleToDirection = true;
+                        auto dirPos = NeighborIndex(direction).pos();
+                        auto dirFloat = NeighborIndex(direction).floating();
+                        for (auto dir2 = 0; dir2 < 26; ++dir2) {
+                            if (direction == dir2) {
+                                continue;
+                            }
+                            std::array<int, 3> neighbor2;
+                            if (!hasNeighborInDirection(idx, dir2, neighbor2) ||
+                                !component[neighbor2]) {
+                                // There is no active neighbor in this direction
+                                // to check.
+                                continue;
+                            }
+                            auto dir2Pos = NeighborIndex(dir2).pos();
+                            // Determine what dir2 is from direction.
+                            auto dir2Float = NeighborIndex(dir2).floating();
+                            if ((dirPos ^ dir2Pos) & ~dirFloat & ~dir2Float) {
+                                // direction and dir2 are not adjacent.
+                                collapsibleToDirection = false;
+                                break;
+                            }
+                            auto relativeFloat = (dirFloat & dir2Float) |
+                                (7 & ~dirFloat & ~dir2Float &
+                                    ~(dirPos ^ dir2Pos));
+                            auto relativePos = dir2Pos | 
+                                (7 & ~dirFloat & ~dirPos);
+                            auto relativeDir = NeighborIndex::
+                                fromPosAndFloating(
+                                    relativePos, relativeFloat).i;
+                            if (!hasNeighborInDirection(
+                                neighbor, relativeDir, neighbor2)) {
+                                collapsibleToDirection = false;
+                                break;
+                            }
+                        }
+                        if (collapsibleToDirection) {
+                            foundCollapsible = true;
+                            break;
+                        }
+                    }
+                    if (foundCollapsible) {
+                        madeChange = true;
+                        component[idx] = false;
+                    }
+                }
+                if (component[idx]) {
+                    newHighBound = rawIdx + 1;
+                }
+                else if (rawIdx == lowBound) {
+                    ++lowBound;
+                }
+            }
+            assert(newHighBound <= highBound);
+            highBound = newHighBound;
+            if (highBound - lowBound <= 1) {
+                return true;
+            }
+            else if (!madeChange) {
+                return false;
+            }
+        }
+    }
+}
+
+template<unsigned N, class Leaf>
+uint32_t SimplexTree<N, Leaf>::leafLevel() const
 {
     assert(!this->isBranch());
     switch (this->type)
@@ -674,38 +1082,38 @@ uint32_t SimplexTree<N>::leafLevel() const
 /*  This helper struct lets us make a directed acyclic graph
  *  of neighbors, automatically cleaning them up when no one
  *  is using them anymore.  */
-template <unsigned N>
+template<unsigned N, class Leaf>
 struct NeighborStack {
-    SimplexNeighbors<N> ns;
-    std::shared_ptr<NeighborStack<N>> parent;
+    SimplexNeighbors<N, Leaf> ns;
+    std::shared_ptr<NeighborStack<N, Leaf>> parent;
 };
 
-template <unsigned N>
+template<unsigned N, class Leaf>
 struct AssignIndexTask {
-    const SimplexTree<N>* target;
-    std::shared_ptr<NeighborStack<N>> neighbors;
+    const SimplexTree<N, Leaf>* target;
+    std::shared_ptr<NeighborStack<N, Leaf>> neighbors;
 };
 
-template <unsigned N>
+template<unsigned N, class Leaf>
 using LockFreeStack = boost::lockfree::stack<
-        AssignIndexTask<N>,
+        AssignIndexTask<N, Leaf>,
         boost::lockfree::fixed_sized<true>>;
 
-template <unsigned N>
-void assignIndicesWorker(LockFreeStack<N>& tasks,
+template<unsigned N, class Leaf>
+void assignIndicesWorker(LockFreeStack<N, Leaf>& tasks,
                          std::atomic<uint64_t>& index,
                          std::atomic_bool& done,
                          std::atomic_bool& cancel)
 {
     // See detailed comments in worker_pool.cpp, which
     // implements a similar worker pool system.
-    std::stack<AssignIndexTask<N>, std::vector<AssignIndexTask<N>>> local;
+    std::stack<AssignIndexTask<N, Leaf>, std::vector<AssignIndexTask<N, Leaf>>> local;
 
     while (!done.load() && !cancel.load()) {
         // Pick a task from the local empty, falling back to the MPMC
         // stack if the local stack is empty.  If both are empty, then
         // spin here until another thread adds a task to the global stack.
-        AssignIndexTask<N> task;
+        AssignIndexTask<N, Leaf> task;
         if (local.size()) {
             task = local.top();
             local.pop();
@@ -721,10 +1129,10 @@ void assignIndicesWorker(LockFreeStack<N>& tasks,
         // subtree as a new task.
         if (task.target->isBranch()) {
             for (unsigned i=0; i < task.target->children.size(); ++i) {
-                AssignIndexTask<N> next_task;
+                AssignIndexTask<N, Leaf> next_task;
 
                 next_task.target = task.target->children[i].load();
-                next_task.neighbors = std::make_shared<NeighborStack<N>>();
+                next_task.neighbors = std::make_shared<NeighborStack<N, Leaf>>();
                 next_task.neighbors->ns = task.neighbors->ns.push(i, task.target->children);
                 next_task.neighbors->parent = task.neighbors;
 
@@ -836,7 +1244,7 @@ void assignIndicesWorker(LockFreeStack<N>& tasks,
             }
         }
 
-        SimplexTree<N>* t = nullptr;
+        SimplexTree<N, Leaf>* t = nullptr;
         for (t = task.target->parent; t && t->pending-- == 0; t = t->parent)
         {
             // Walk up the tree here!
@@ -850,13 +1258,13 @@ void assignIndicesWorker(LockFreeStack<N>& tasks,
     done.store(true);
 }
 
-template <unsigned N>
-void SimplexTree<N>::assignIndices(const BRepSettings& settings) const
+template<unsigned N, class Leaf>
+void SimplexTree<N, Leaf>::assignIndices(const BRepSettings& settings) const
 {
     this->resetPending();
 
-    LockFreeStack<N> tasks(settings.workers);
-    AssignIndexTask<N> first{this, std::make_shared<NeighborStack<N>>()};
+    LockFreeStack<N, Leaf> tasks(settings.workers);
+    AssignIndexTask<N, Leaf> first{this, std::make_shared<NeighborStack<N, Leaf>>()};
     tasks.push(first);
 
     std::atomic<uint64_t> global_index(1);
@@ -879,8 +1287,8 @@ void SimplexTree<N>::assignIndices(const BRepSettings& settings) const
     assert(done.load() || settings.cancel.load());
 }
 
-template <unsigned N>
-void SimplexTree<N>::releaseTo(Pool& object_pool) {
+template<unsigned N, class Leaf>
+void SimplexTree<N, Leaf>::releaseTo(Pool& object_pool) {
     if (this->leaf != nullptr) {
         this->leaf->releaseTo(object_pool.next());
         this->leaf = nullptr;
