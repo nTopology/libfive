@@ -22,6 +22,7 @@ enum BRepAlgorithm {
     DUAL_CONTOURING,
     ISO_SIMPLEX,
     HYBRID,
+    SIMPLEX_DC,
 };
 
 struct BRepSettings {
@@ -34,6 +35,7 @@ public:
     void reset() {
         min_feature = 0.1;
         max_err = 1e-8;
+        simplex_dc_triangle_control = 1e-4;
         workers = 8;
         alg = DUAL_CONTOURING;
         free_thread_handler = nullptr;
@@ -52,11 +54,19 @@ public:
      *  completely disable cell merging.  */
     double max_err;
 
+    /*  This value is used in simplex DC meshing when deciding whether to 
+     *  collapse nearby intersection vertices, as well as how close to the
+     *  faces of a simplex the simplex intersection can be.  If it is very
+     *  small, the resulting mesh will be more accurate, but will have more
+     *  tiny triangles, as well as more triangles overall.  It should never
+     *  be more than 0.5.*/
+    double simplex_dc_triangle_control;
+
     /*  Number of worker threads to use while meshing.  Set as 0 to use the
      *  platform-default number of threads. */
     unsigned workers;
 
-    /*  This is the meshing algorti */
+    /*  This is the meshing algorithm */
     BRepAlgorithm alg;
 
     /*  Optional function called when a thread finds itself without anything

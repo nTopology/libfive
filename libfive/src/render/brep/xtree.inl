@@ -64,6 +64,14 @@ const T* XTree<N, T, L>::child(unsigned i) const
         : static_cast<const T*>(this);
 }
 
+template<unsigned N, typename T, typename L>
+T* XTree<N, T, L>::child(unsigned i)
+{
+    return isBranch()
+        ? children[i].load(std::memory_order_relaxed)
+        : static_cast<T*>(this);
+}
+
 template <unsigned N, typename T, typename L>
 void XTree<N, T, L>::resetPending() const
 {
@@ -83,6 +91,30 @@ void XTree<N, T, L>::setType(Interval::State t)
 {
     type = t;
     done();
+}
+
+template<unsigned N, typename T, typename L>
+inline T* XTree<N, T, L>::neighbor(NeighborIndex neighbor)
+{
+    auto floating = neighbor.floating();
+    assert(highestbit(floating) < N);
+    if (bitcount(floating) == N) {
+        return static_cast<T*>(this);
+    }
+    else if (parent == nullptr) {
+        return nullptr;
+    }
+    auto pos = neighbor.pos();
+    assert(highestbit(pos) < N);
+    auto neighborFromParentFloat = floating | (pos ^ parent_index);
+    auto neighborFromParent = 
+        NeighborIndex::fromPosAndFloating(pos, neighborFromParentFloat);
+    auto parentNeighbor = parent->neighbor(neighborFromParent);
+    if (parentNeighbor == nullptr) {
+        return nullptr;
+    }
+    return parentNeighbor->child(
+        (children.size() - 1) ^ floating ^ parent_index);
 }
 
 template <unsigned N, typename T, typename L>

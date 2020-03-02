@@ -16,8 +16,9 @@ You can obtain one at http://mozilla.org/MPL/2.0/.
 
 namespace libfive {
 
-template <typename T, typename Neighbors, unsigned N>
-Root<T> WorkerPool<T, Neighbors, N>::build(
+template <typename T, typename Neighbors, unsigned N, bool constOut>
+typename WorkerPool<T, Neighbors, N, constOut>::OutType 
+WorkerPool<T, Neighbors, N, constOut>::build(
         Tree t, const Region<N>& region_,
         const BRepSettings& settings)
 {
@@ -30,8 +31,9 @@ Root<T> WorkerPool<T, Neighbors, N>::build(
     return build(es.data(), region_, settings);
 }
 
-template <typename T, typename Neighbors, unsigned N>
-Root<T> WorkerPool<T, Neighbors, N>::build(
+template <typename T, typename Neighbors, unsigned N, bool constOut>
+typename WorkerPool<T, Neighbors, N, constOut>::OutType
+WorkerPool<T, Neighbors, N, constOut>::build(
         Evaluator* eval, const Region<N>& region_,
         const BRepSettings& settings)
 {
@@ -48,7 +50,7 @@ Root<T> WorkerPool<T, Neighbors, N>::build(
     std::vector<std::future<void>> futures;
     futures.resize(settings.workers);
 
-    Root<T> out(root);
+    OutType out(root);
     std::mutex root_lock;
 
     // Kick off the progress tracking thread, based on the number of
@@ -80,7 +82,7 @@ Root<T> WorkerPool<T, Neighbors, N>::build(
 
     if (settings.cancel.load())
     {
-        return Root<T>();
+        return OutType();
     }
     else
     {
@@ -88,10 +90,10 @@ Root<T> WorkerPool<T, Neighbors, N>::build(
     }
 }
 
-template <typename T, typename Neighbors, unsigned N>
-void WorkerPool<T, Neighbors, N>::run(
+template <typename T, typename Neighbors, unsigned N, bool constOut>
+void WorkerPool<T, Neighbors, N, constOut>::run(
         Evaluator* eval, LockFreeStack& tasks,
-        Root<T>& root, std::mutex& root_lock,
+        OutType& root, std::mutex& root_lock,
         const BRepSettings& settings,
         std::atomic_bool& done)
 {

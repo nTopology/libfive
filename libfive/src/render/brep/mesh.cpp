@@ -30,6 +30,16 @@ You can obtain one at http://mozilla.org/MPL/2.0/.
 #include "libfive/render/brep/hybrid/hybrid_worker_pool.hpp"
 #include "libfive/render/brep/hybrid/hybrid_mesher.hpp"
 
+// Simplex DC meshing
+#include "libfive/render/brep/simplex_dc/simplex_dc_worker_pool.hpp"
+#include "libfive/render/brep/simplex_dc/simplex_dc_debug.hpp"
+#include "libfive/render/brep/simplex_dc/simplex_dc_edges.hpp"
+#include "libfive/render/brep/simplex_dc/simplex_dc_sub_consolidator.hpp"
+#include "libfive/render/brep/simplex_dc/simplex_dc_collapser.hpp"
+#include "libfive/render/brep/simplex_dc/simplex_dc_intersecter.hpp"
+#include "libfive/render/brep/simplex_dc/simplex_dc_vertexer.hpp"
+#include "libfive/render/brep/simplex_dc/simplex_dc_mesher.hpp"
+
 namespace libfive {
 
 std::unique_ptr<Mesh> Mesh::render(const Tree t, const Region<3>& r,
@@ -115,6 +125,115 @@ std::unique_ptr<Mesh> Mesh::render(
                     return HybridMesher(brep, &es[i]);
                 });
         t.reset(settings);
+    }
+    else if (settings.alg == SIMPLEX_DC) {
+        if (settings.progress_handler) {
+            // Pool::build, Edges, SubConsolidator Collapser 2 and 3, 
+            // Intersecter, Vertexer, Mesher, t.reset
+            settings.progress_handler->start({ 1, 1, 1, 1, 1, 1, 1, 1, 1 });
+        }
+        auto t = SimplexDCWorkerPool<3>::build(es, r, settings);
+        if (settings.cancel.load() || t.get() == nullptr) {
+            if (settings.progress_handler) {
+                settings.progress_handler->finish();
+            }
+            return nullptr;
+        }
+
+        // Edges
+        Dual<3>::walk<SimplexDCEdges<3>, decltype(t.pool())> (
+            t, settings, t.pool());
+
+        if (settings.cancel.load()) {
+            if (settings.progress_handler) {
+                settings.progress_handler->finish();
+            }
+            t.reset(settings);
+            return nullptr;
+        }
+
+        Dual<3>::walk<SimplexDCSubConsolidator<3>>(t, settings);
+        
+        // Collapser for edges and faces
+        Dual<3>::walk_<SimplexDCCollapser<3, 2>>(
+            t, settings, 
+            [&](SimplexDCCollapser<3, 2>::PerThreadOutput& out, int i) {
+            return SimplexDCCollapser<3, 2>(out, &es[i]);
+        });
+        // Collapser for cells
+        Dual<3>::walk_<SimplexDCCollapser<3, 3>>(
+            t, settings,
+            [&](SimplexDCCollapser<3, 3>::PerThreadOutput& out, int i) {
+            return SimplexDCCollapser<3, 3>(out, &es[i]);
+        });
+
+        if (settings.cancel.load()) {
+            if (settings.progress_handler) {
+                settings.progress_handler->finish();
+            }
+            t.reset(settings);
+            return nullptr;
+        }
+
+        testSubs(*t.get());
+
+        // Get the intersections
+        auto mergeRatio = settings.simplex_dc_triangle_control;
+        auto intersectionMap = Dual<3>::walk_<SimplexDCIntersecter<3>>(
+            t, settings, 
+            [&](SimplexDCIntersecter<3>::PerThreadOutput& brep, int i) {
+            return SimplexDCIntersecter<3>(
+                brep, &es[i], t.pool(), mergeRatio * mergeRatio, {});
+        });
+
+        if (settings.cancel.load()) {
+            if (settings.progress_handler) {
+                settings.progress_handler->finish();
+            }
+            t.reset(settings);
+            return nullptr;
+        }
+
+        auto intersectionVerts = intersectionMap->buildVecs();
+
+        for (auto& a : intersectionVerts) {
+            for (auto& b : intersectionVerts) {
+                if (a == b && &a != &b) {
+                    throw std::pair(a, b);
+                }
+            }
+        }
+
+        // Get the vertices
+        auto vertsBRep = Dual<3>::walk<SimplexDCVertexer<3>>(
+            t, settings, intersectionVerts.size() - 1/*Vert offset*/,
+            settings.simplex_dc_triangle_control/*Padding*/);
+
+        if (settings.cancel.load()) {
+            if (settings.progress_handler) {
+                settings.progress_handler->finish();
+            }
+            t.reset(settings);
+            return nullptr;
+        }
+
+        // Connect the vertices
+        out = Dual<3>::walk<SimplexDCMesher>(t, settings);
+
+        if (settings.cancel.load()) {
+            if (settings.progress_handler) {
+                settings.progress_handler->finish();
+            }
+            t.reset(settings);
+            return nullptr;
+        }
+
+        t.reset(settings);
+
+        out->verts = std::move(intersectionVerts);
+        assert(!vertsBRep->verts.empty());
+        out->verts.insert(out->verts.end(), 
+            vertsBRep->verts.begin() + 1, vertsBRep->verts.end());
     }
 
     if (settings.progress_handler) {

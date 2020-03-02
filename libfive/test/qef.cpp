@@ -196,7 +196,7 @@ TEST_CASE("QEF::solveBounded")
         Region<2> r({1, 0}, {2, 1});
 
         {
-            auto sol = q.solveBounded(r);
+            auto sol = q.solveBounded(r, 1 - 1e-9);
             REQUIRE(sol.position == Eigen::Vector2d(1.5, 0.25));
             REQUIRE(sol.error == Approx(0.0));
             REQUIRE(sol.value == Approx(0.25));
@@ -209,7 +209,7 @@ TEST_CASE("QEF::solveBounded")
         q.insert({2, 1}, {0, 1}, 1);
 
         {
-            auto sol = q.solveBounded(r);
+            auto sol = q.solveBounded(r, 1 - 1e-9);
             REQUIRE(sol.position == Eigen::Vector2d(1.5, 0.5));
             REQUIRE(sol.error == Approx(0.0));
             REQUIRE(sol.value == Approx(0.5));
@@ -223,7 +223,7 @@ TEST_CASE("QEF::solveBounded")
         {
             Region<2> r({1, 0}, {2, 1});
             QEF<2> q = fromCorners(r, c);
-            const auto sol = q.solveBounded(r);
+            const auto sol = q.solveBounded(r, 1 - 1e-9);
             CAPTURE(sol.position);
             CAPTURE(sol.value);
             CAPTURE(sol.rank);
@@ -237,7 +237,7 @@ TEST_CASE("QEF::solveBounded")
         {
             Region<2> r({1, 2}, {2, 3});
             QEF<2> q = fromCorners(r, c);
-            const auto sol = q.solveBounded(r);
+            const auto sol = q.solveBounded(r, 1 - 1e-9);
             CAPTURE(sol.position);
             CAPTURE(sol.value);
             CAPTURE(sol.rank);

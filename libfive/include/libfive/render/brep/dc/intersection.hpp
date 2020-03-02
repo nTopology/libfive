@@ -29,8 +29,8 @@ struct Intersection {
     }
 
     void push(Eigen::Matrix<double, N, 1> pos,
-              Eigen::Matrix<double, N, 1> deriv,
-              double value)
+        Eigen::Matrix<double, N, 1> deriv,
+        double value)
     {
         Eigen::Matrix<double, N + 1, 1> mp;
         mp << pos, 1.0;

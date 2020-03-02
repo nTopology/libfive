@@ -28,22 +28,23 @@ class VolTree;
  *  A WorkerPool is used to construct a recursive tree (quadtree / octree)
  *  by sharing the work among a pool of threads.
  */
-template <typename T, typename Neighbors, unsigned N>
+template <typename T, typename Neighbors, unsigned N, bool constOut = true>
 class WorkerPool
 {
 public:
+    using OutType = Root<std::conditional_t<constOut, const T, T>>;
     /*
      *  Evaluation function that builds a local evaluator array
      *  (based on settings.workers)
      */
-    static Root<T> build(Tree t, const Region<N>& region,
+    static OutType build(Tree t, const Region<N>& region,
                          const BRepSettings& settings);
     /*
      *  General-purpose evaluation function
      *
      *  eval must be an array of at least [settings.workers] evaluators
      */
-    static Root<T> build(Evaluator* eval, const Region<N>& region,
+    static OutType build(Evaluator* eval, const Region<N>& region,
                          const BRepSettings& settings);
 
 protected:
@@ -58,7 +59,7 @@ protected:
         boost::lockfree::stack<Task, boost::lockfree::fixed_sized<true>>;
 
     static void run(Evaluator* eval, LockFreeStack& tasks,
-                    Root<T>& root, std::mutex& root_lock,
+                    OutType& root, std::mutex& root_lock,
                     const BRepSettings& settings,
                     std::atomic_bool& done);
 };

@@ -11,12 +11,12 @@ You can obtain one at http://mozilla.org/MPL/2.0/.
 #include "../object_pool.inl"
 
 namespace libfive {
-template class ObjectPool<SimplexTree<2>, SimplexLeaf<2>,
+template class ObjectPool<SimplexTree<2, SimplexLeaf<2>>, SimplexLeaf<2>,
                           SimplexLeafSubspace<2>>;
 template class ObjectPool<SimplexLeaf<2>, SimplexLeafSubspace<2>>;
 template class ObjectPool<SimplexLeafSubspace<2>>;
 
-template SimplexTree<2>* ObjectPool<SimplexTree<2>, SimplexLeaf<2>,
+template SimplexTree<2>* ObjectPool<SimplexTree<2, SimplexLeaf<2>>, SimplexLeaf<2>,
                           SimplexLeafSubspace<2>>::get(
         libfive::SimplexTree<2>*, unsigned, Region<2>);
 template SimplexLeaf<2>* ObjectPool<SimplexLeaf<2>,
