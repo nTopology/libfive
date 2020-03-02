@@ -10,5 +10,5 @@ You can obtain one at http://mozilla.org/MPL/2.0/.
 #include "simplex_tree.inl"
 
 namespace libfive {
-template class XTree<2, SimplexTree<2>, SimplexLeaf<2>>;
+template class XTree<2, SimplexTree<2, SimplexLeaf<2>>, SimplexLeaf<2>>;
 }   // namespace libfive

@@ -30,7 +30,8 @@ You can obtain one at http://mozilla.org/MPL/2.0/.
 namespace libfive {
 
 /* Forward declarations */
-template <unsigned N> class SimplexNeighbors;
+template <unsigned N, class Leaf> class SimplexNeighbors;
+template<unsigned N, class Leaf> class SimplexTree;
 template <unsigned N> class Region;
 struct BRepSettings;
 
@@ -68,6 +69,11 @@ struct SimplexLeaf
     void reset();
 
     using Pool = ObjectPool<SimplexLeaf, SimplexLeafSubspace<N>>;
+
+    using ParentPool = ObjectPool<SimplexTree<N, SimplexLeaf>, 
+                                  SimplexLeaf, 
+                                  SimplexLeafSubspace<N>>;
+
     void releaseTo(Pool& object_pool);
 
     /*  One QEF structure per subspace in the leaf, shared between neighbors.
@@ -94,13 +100,11 @@ struct SimplexLeaf
     unsigned level;
 };
 
-template <unsigned N>
-class SimplexTree : public XTree<N, SimplexTree<N>, SimplexLeaf<N>>
+template <unsigned N, class Leaf = SimplexLeaf<N>>
+class SimplexTree : public XTree<N, SimplexTree<N, Leaf>, Leaf>
 {
 public:
-    using Pool = ObjectPool<SimplexTree<N>,
-                            SimplexLeaf<N>,
-                            SimplexLeafSubspace<N>>;
+  using Pool = typename Leaf::ParentPool;
 
     /*
      *  Simple constructor
@@ -113,15 +117,16 @@ public:
     /*
      *  Complete constructor
      */
-    explicit SimplexTree(SimplexTree<N>* parent, unsigned index,
+    explicit SimplexTree(SimplexTree<N, Leaf>* parent, unsigned index,
                          const Region<N>&);
 
     /*
      *  Constructs an empty SimplexTree
      *
-     *  This only exists for API completeness, and should never
-     *  be called.  The returned tree has an invalid parent pointer
-     *  and Interval::UNKNOWN as its type.
+     *  This is called during dual walking, to represent the trees outside
+     *  the original bounding box.  The returned tree has an invalid parent 
+     *  pointer and Interval::UNKNOWN as its type, and therefore must be
+     *  handled accordingly by the walker.
      */
     static std::unique_ptr<SimplexTree> empty();
 
@@ -143,7 +148,7 @@ public:
     void evalLeaf(Evaluator* eval,
                   const std::shared_ptr<Tape>& tape,
                   Pool& object_pool,
-                  const SimplexNeighbors<N>& neighbors);
+                  const SimplexNeighbors<N, Leaf>& neighbors);
 
     /*
      *  If all children are present, then collapse based on the error
@@ -190,9 +195,9 @@ public:
     typedef Eigen::Matrix<double, N, 1> Vec;
 
     static bool hasSingletons() { return false; }
-    static SimplexTree<N>* singletonEmpty() { return nullptr; }
-    static SimplexTree<N>* singletonFilled() { return nullptr; }
-    static bool isSingleton(const SimplexTree<N>*) { return false; }
+    static SimplexTree<N, Leaf>* singletonEmpty() { return nullptr; }
+    static SimplexTree<N, Leaf>* singletonFilled() { return nullptr; }
+    static bool isSingleton(const SimplexTree<N, Leaf>*) { return false; }
 
 protected:
     /*
@@ -220,7 +225,7 @@ protected:
     void findLeafVertices(Evaluator* eval,
                           const Tape::Handle& tape,
                           Pool& object_pool,
-                          const SimplexNeighbors<N>& neighbors);
+                          const SimplexNeighbors<N, Leaf>& neighbors);
 
     /*
      *  Unwraps the atomic pointers, returning an array of plain pointers

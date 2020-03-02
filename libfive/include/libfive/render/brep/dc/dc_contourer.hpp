@@ -23,12 +23,19 @@ class DCContourer
 {
 public:
     using Output = Contours;
-    using Input = DCTree<2>;
+    using PerThreadOutput = PerThreadBRep<2>;
+    using Input = const DCTree<2>;
 
     DCContourer(PerThreadBRep<2>& m) : m(m) {}
 
+    /* Empty cell loader */
+    void load(Input* input) {}
+
     template <Axis::Axis A>
-    void load(const std::array<const DCTree<2>*, 2>& ts);
+    void load(const std::array<Input*, 2>& ts);
+
+    /* Empty corner loader */
+    void load(const std::array<Input*, 4> & ts) {}
 
     static bool needsTopEdges() { return false; }
 

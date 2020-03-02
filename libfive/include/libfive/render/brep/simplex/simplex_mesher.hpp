@@ -19,7 +19,8 @@ You can obtain one at http://mozilla.org/MPL/2.0/.
 namespace libfive {
 
 // Forward declarations
-template <unsigned N> class SimplexTree;
+template <unsigned N, class Leaf> class SimplexTree;
+template <unsigned N> struct SimplexLeaf;
 template <unsigned N> class PerThreadBRep;
 class Evaluator;
 class Mesh;
@@ -28,7 +29,8 @@ class SimplexMesher
 {
 public:
     using Output = Mesh;
-    using Input = SimplexTree<3>;
+    using PerThreadOutput = PerThreadBRep<3>;
+    using Input = const SimplexTree<3, SimplexLeaf<3>>;
 
     /*
      *  Constructs a mesher that owns an evaluator,
@@ -45,11 +47,23 @@ public:
 
     ~SimplexMesher();
 
+    /* Empty cell loader, called by Dual::walk */
+    void load(Input* input) {}
+
     /*
      *  Called by Dual::walk to construct the triangle mesh
      */
     template <Axis::Axis A>
-    void load(const std::array<const SimplexTree<3>*, 4>& ts);
+    void load(const std::array<const Input*, 4>& ts);
+
+    /*
+     *  Empty face loader, called by Dual::walk
+     */
+    template <Axis::Axis A>
+    void load(const std::array<const Input*, 2> & ts) {}
+
+    /* Empty corner loader */
+    void load(const std::array<const Input*, 8> & ts) {}
 
     /*
      *  Simplex meshing needs to walk the top edges of the tree,

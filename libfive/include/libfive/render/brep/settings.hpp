@@ -22,6 +22,7 @@ enum BRepAlgorithm {
     DUAL_CONTOURING,
     ISO_SIMPLEX,
     HYBRID,
+    SIMPLEX_DC,
 };
 
 struct BRepSettings {
