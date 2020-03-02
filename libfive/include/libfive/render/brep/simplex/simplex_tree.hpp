@@ -30,7 +30,8 @@ You can obtain one at http://mozilla.org/MPL/2.0/.
 namespace libfive {
 
 /* Forward declarations */
-template <unsigned N> class SimplexNeighbors;
+template <unsigned N, class Leaf> class SimplexNeighbors;
+template<unsigned N, class Leaf> class SimplexTree;
 template <unsigned N> class Region;
 struct BRepSettings;
 
@@ -58,6 +59,14 @@ struct SimplexLeafSubspace {
      *  the pool while they're still in use.  */
     std::atomic<uint32_t> refcount;
 
+    /*  In Simplex DC meshing, it is possible for one subspace vertex to be
+     *  collapsed into another one.  This tracks that collapsing; it uses
+     *  the same ternary method as subs, but includes only those axes that
+     *  are floating in this sub; in the case of a face in 3 dimensions, the
+     *  ordering of the axes for this purpose is Q(A), R(A), where A is the 
+     *  axis of the face.*/
+    unsigned collapseRef;
+
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
@@ -68,6 +77,11 @@ struct SimplexLeaf
     void reset();
 
     using Pool = ObjectPool<SimplexLeaf, SimplexLeafSubspace<N>>;
+
+    using ParentPool = ObjectPool<SimplexTree<N, SimplexLeaf>, 
+                                  SimplexLeaf, 
+                                  SimplexLeafSubspace<N>>;
+
     void releaseTo(Pool& object_pool);
 
     /*  One QEF structure per subspace in the leaf, shared between neighbors.
@@ -92,15 +106,16 @@ struct SimplexLeaf
 
     /*  Represents how far from minimum-size leafs we are */
     unsigned level;
+
+    constexpr static double qefShrink = 1. - 1e-9;
 };
 
-template <unsigned N>
-class SimplexTree : public XTree<N, SimplexTree<N>, SimplexLeaf<N>>
+template <unsigned N, class Leaf = SimplexLeaf<N>>
+class SimplexTree : public XTree<N, SimplexTree<N, Leaf>, Leaf>
 {
 public:
-    using Pool = ObjectPool<SimplexTree<N>,
-                            SimplexLeaf<N>,
-                            SimplexLeafSubspace<N>>;
+
+  using Pool = typename Leaf::ParentPool;
 
     /*
      *  Simple constructor
@@ -113,15 +128,16 @@ public:
     /*
      *  Complete constructor
      */
-    explicit SimplexTree(SimplexTree<N>* parent, unsigned index,
+    explicit SimplexTree(SimplexTree<N, Leaf>* parent, unsigned index,
                          const Region<N>&);
 
     /*
      *  Constructs an empty SimplexTree
      *
-     *  This only exists for API completeness, and should never
-     *  be called.  The returned tree has an invalid parent pointer
-     *  and Interval::UNKNOWN as its type.
+     *  This is called during dual walking, to represent the trees outside
+     *  the original bounding box.  The returned tree has an invalid parent 
+     *  pointer and Interval::UNKNOWN as its type, and therefore must be
+     *  handled accordingly by the walker.
      */
     static std::unique_ptr<SimplexTree> empty();
 
@@ -133,7 +149,8 @@ public:
      */
     std::shared_ptr<Tape> evalInterval(Evaluator* eval,
                                        const std::shared_ptr<Tape>& tape,
-                                       Pool& object_pool);
+                                       Pool& object_pool,
+                                       const BRepSettings& settings);
 
     /*
      *  Evaluates and stores a result at every corner of the cell.
@@ -143,7 +160,8 @@ public:
     void evalLeaf(Evaluator* eval,
                   const std::shared_ptr<Tape>& tape,
                   Pool& object_pool,
-                  const SimplexNeighbors<N>& neighbors);
+                  const SimplexNeighbors<N, Leaf>& neighbors,
+                  const BRepSettings& settings);
 
     /*
      *  If all children are present, then collapse based on the error
@@ -154,7 +172,7 @@ public:
     bool collectChildren(Evaluator* eval,
                          const std::shared_ptr<Tape>& tape,
                          Pool& object_pool,
-                         double max_err);
+                         const BRepSettings& settings);
 
     /*  Looks up the cell's level for purposes of vertex placement,
      *  returning 0 or more for LEAF / EMPTY / FILLED cells (depending
@@ -190,18 +208,23 @@ public:
     typedef Eigen::Matrix<double, N, 1> Vec;
 
     static bool hasSingletons() { return false; }
-    static SimplexTree<N>* singletonEmpty() { return nullptr; }
-    static SimplexTree<N>* singletonFilled() { return nullptr; }
-    static bool isSingleton(const SimplexTree<N>*) { return false; }
+    static SimplexTree<N, Leaf>* singletonEmpty() { return nullptr; }
+    static SimplexTree<N, Leaf>* singletonFilled() { return nullptr; }
+    static bool isSingleton(const SimplexTree<N, Leaf>*) { return false; }
 
-protected:
     /*
      *  Calculate and store whether each vertex is inside or outside
      *  This populates leaf->sub[i]->inside, for i in 0..ipow(3, N)
      */
     void saveVertexSigns(Evaluator* eval,
-                         const Tape::Handle& tape,
-                         const std::array<bool, ipow(3, N)>& already_solved);
+        const Tape::Handle& tape,
+        const std::array<bool, ipow(3, N)>& already_solved);
+protected:
+
+    /*  We make a copy of the children when collecting them, in order to avoid
+     *  atomics.  This typedef makes it easier to pass that on to other methods.
+     */
+    using RawChildArray = std::array<SimplexTree<N, Leaf>*, 1 << N>;
 
     /*
      *  Sets this->type to EMPTY / FILLED / AMBIGUOUS depending on
@@ -220,7 +243,69 @@ protected:
     void findLeafVertices(Evaluator* eval,
                           const Tape::Handle& tape,
                           Pool& object_pool,
-                          const SimplexNeighbors<N>& neighbors);
+                          const SimplexNeighbors<N, Leaf>& neighbors,
+                          const BRepSettings& settings);
+
+    /*  
+     *  This helper struct allows us to easily reference a subspace of a child.
+     *  It is actually independent of the SimplexTree template arguments, so at
+     *  some point we may wish to move it to its own file.
+     */
+    template <unsigned K>
+    struct ChildSubArray
+    {
+        ChildSubArray(bool b) : components{ b, b, b, b, b } {}
+        ChildSubArray() = default;
+        // Helper function to perform template differentiation.
+        static auto getComponentTypeRep() {
+            if constexpr (K == 1) {
+                return false; // Child is bool
+            }
+            else {
+                // Child is next dimension down.
+                return ChildSubArray<K - 1>(false); 
+            }
+        }
+
+        using ComponentType = decltype(ChildSubArray<K>::getComponentTypeRep());
+
+        // We have 5 elements in each direction: Fixed lower of the lower
+        // child, floating of the lower child, fixed lower of the upper child/
+        // upper of the lower child, floating of the upper child, and fixed
+        // upper of the upper child.
+        std::array<ComponentType, 5> components;
+
+        bool& operator[](std::array<int, K> ar) {
+            if constexpr (K == 1) {
+                return components[ar[0]];
+            }
+            else {
+                std::array<int, K - 1> newArray;
+                std::copy(ar.begin() + 1, ar.end(), newArray.begin());
+                return components[ar[0]][newArray];
+            }
+        }
+        bool operator[](std::array<int, K> ar) const {
+            if constexpr (K == 1) {
+                return components[ar[0]];
+            }
+            else {
+                std::array<int, K - 1> newArray;
+                std::copy(ar.begin() + 1, ar.end(), newArray.begin());
+                return components[ar[0]][newArray];
+            }
+        }
+        void flip() {
+            for (auto& component : components) {
+                if constexpr (K == 1) {
+                    component = !component;
+                }
+                else {
+                    component.flip();
+                }
+            }
+        }
+    };
 
     /*
      *  Unwraps the atomic pointers, returning an array of plain pointers
@@ -228,6 +313,23 @@ protected:
      *  simultaneously!
      */
     std::array<SimplexLeafSubspace<N>*, ipow(3, N)> getLeafSubs() const;
+
+    /*
+     *  Indicates whether this node can be collapsed without changing the
+     *  topology of the piece.  "children" should refer to the children of
+     *  *this, and must all be leaves.  *this must also have its leaf set,
+     *  and its subspaces populated.
+     */
+     bool isCollapsible(const RawChildArray& children);
+
+    /*
+     *  Indicates whether the designated subspace can be collapsed without
+     *  changing topology, provided that its sub-subspaces can be collapsed.
+     *  (Otherwise, it is still safe to call.)  Conditions on *this are the 
+     *  same as for "isCollapsible".
+     */
+     bool subIsCollapsible(unsigned subIndex, 
+                           const ChildSubArray<N>& childSubsInside);
 };
 
 }   // namespace libfive

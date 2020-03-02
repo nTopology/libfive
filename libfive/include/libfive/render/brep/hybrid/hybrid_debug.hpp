@@ -34,7 +34,8 @@ class HybridDebugMesher
 {
 public:
     using Output = Mesh;
-    using Input = HybridTree<3>;
+    using PerThreadOutput = PerThreadBRep<3>;
+    using Input = const HybridTree<3>;
 
     /*
      *  Constructs a mesher that owns an evaluator,
@@ -51,11 +52,23 @@ public:
 
     ~HybridDebugMesher();
 
+    /* Empty cell loader, called by Dual::walk */
+    void load(Input* input) {}
+
     /*
      *  Called by Dual::walk to construct the triangle mesh
      */
     template <Axis::Axis A>
     void load(const std::array<const HybridTree<3>*, 4>& ts);
+
+    /*
+     *  Empty face loader, called by Dual::walk
+     */
+    template <Axis::Axis A>
+    void load(const std::array<const HybridTree<3>*, 2> & ts) {}
+
+    /* Empty corner loader */
+    void load(const std::array<const HybridTree<3>*, 8> & ts) {}
 
     /*
      *  Hybrid meshing needs to walk the top edges of the tree,

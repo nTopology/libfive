@@ -10,7 +10,7 @@ You can obtain one at http://mozilla.org/MPL/2.0/.
 #include "simplex_tree.inl"
 
 namespace libfive {
-template class SimplexTree<3>;
+template class SimplexTree<3, SimplexLeaf<3>>;
 template struct SimplexLeaf<3>;
 template struct SimplexLeafSubspace<3>;
 }   // namespace libfive

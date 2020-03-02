@@ -201,7 +201,8 @@ void HybridLeaf<N>::reset()
 template <unsigned N>
 Tape::Handle HybridTree<N>::evalInterval(Evaluator* eval,
                                          const Tape::Handle& tape,
-                                         Pool& object_pool)
+                                         Pool& object_pool,
+                                         const BRepSettings&)
 {
     // Do a preliminary evaluation to prune the tree, storing the interval
     // result and an handle to the pushed tape (which we'll use when recursing)
@@ -720,7 +721,8 @@ template <unsigned N>
 void HybridTree<N>::evalLeaf(Evaluator* eval,
                              const Tape::Handle& tape,
                              Pool& object_pool,
-                             const HybridNeighbors<N>& neighbors)
+                             const HybridNeighbors<N>& neighbors,
+                             const BRepSettings&)
 {
     (void)neighbors;
 
@@ -744,7 +746,7 @@ template <unsigned N>
 bool HybridTree<N>::collectChildren(Evaluator* eval,
                                     const Tape::Handle& tape,
                                     Pool& object_pool,
-                                    double max_err)
+                                    const BRepSettings& settings)
 {
     // Wait for collectChildren to have been called N times
     if (this->pending-- != 0)
@@ -795,7 +797,7 @@ bool HybridTree<N>::collectChildren(Evaluator* eval,
     // Eventually, we'll use these variables to perhaps collapse the tree
     (void)eval;
     (void)tape;
-    (void)max_err;
+    (void)settings;
 
     this->done();
     return true;

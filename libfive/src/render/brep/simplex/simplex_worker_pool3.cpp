@@ -12,5 +12,5 @@ You can obtain one at http://mozilla.org/MPL/2.0/.
 #include "libfive/render/brep/simplex/simplex_worker_pool.hpp"
 
 namespace libfive {
-template class WorkerPool<SimplexTree<3>, SimplexNeighbors<3>, 3>;
+template class WorkerPool<SimplexTree<3, SimplexLeaf<3>>, SimplexNeighbors<3, SimplexLeaf<3>>, 3>;
 }
