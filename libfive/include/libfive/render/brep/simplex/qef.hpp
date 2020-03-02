@@ -95,14 +95,17 @@ public:
 
     Solution solve(Eigen::Matrix<double, 1, N> target_pos=
                         Eigen::Matrix<double, 1, N>::Zero(),
-                   double target_value=0.0) const
+                   double target_value = 0.0,
+                   double bound_cutoff = 0.0,
+                   int cutoff_limit = N + 1) const
     {
         Vector target;
         target << target_pos.transpose(), target_value;
 
         const auto AtB_ = AtB();
         // Unpack from raw solution to position + value form
-        const auto sol = QEF<N>::solve(AtA, AtB_, target);
+        const auto sol = 
+            QEF<N>::solve(AtA, AtB_, target, bound_cutoff, 0.0, cutoff_limit);
 
         Solution out;
         out.position = sol.value.template head<N>();
@@ -172,7 +175,9 @@ public:
     Solution solveConstrained(Region<N> region,
                               Eigen::Matrix<double, 1, N> target_pos=
                                   Eigen::Matrix<double, 1, N>::Zero(),
-                              double target_value=0.0) const
+                              double target_value=0.0, 
+                              double eigenvalue_cutoff_relative = 1e-12,
+                              unsigned eigenvalue_cutoff_limit = N + 1) const
     {
         constexpr NeighborIndex Neighbor(Neighbor_);
 
@@ -223,7 +228,9 @@ public:
         assert(r == N + 1 - NumConstrainedAxes);
 
         auto sol = QEF<N - NumConstrainedAxes>::solve(
-                AtA_c, AtB_c, target_c);
+                AtA_c, AtB_c, target_c, 
+                eigenvalue_cutoff_relative, 0.,
+                eigenvalue_cutoff_limit);
 
 #ifdef LIBFIVE_VERBOSE_QEF_DEBUG
         std::cout << "Solving constrained: AtA = [\n" << AtA_c <<
@@ -320,17 +327,25 @@ public:
      *
      *  This is implemented by walking down in dimensionality from N to 0,
      *  picking the lowest-error solution available that is within the bounds.
+     *  If bound_cutoff is positive (it should never be negative), it 
+     *  will be used as the relative eigenvalue cutoff for the algorithm, but
+     *  this eigenvalue cutoff will be used only to the extent necessary to
+     *  fulfill the region-based bounds; walking down in dimensionality will
+     *  thus occur only if the cutoff is unable to produce a result within the
+     *  given region.
      */
-    Solution solveBounded(const Region<N>& region, double shrink=(1 - 1e-9))
+    Solution solveBounded(
+        const Region<N>& region, double shrink, double bound_cutoff = 0)
     {
         return solveBounded(region, shrink,
                             (region.lower + region.upper) / 2.0,
-                            AtBp(N, N) / AtA(N, N));
+                            AtBp(N, N) / AtA(N, N), bound_cutoff);
     }
 
     Solution solveBounded(const Region<N>& region, double shrink,
                           Eigen::Matrix<double, 1, N> target_pos,
-                          double target_value) const
+                          double target_value, 
+                          double bound_cutoff = 1e-12) const
     {
         const auto region_ = region.shrink(shrink);
 
@@ -342,16 +357,28 @@ public:
             << region_.upper.transpose() << "]\n";
 #endif
 
-        {   //  First, check the full-dimension, unconstrained solver
-            auto sol = solve(target_pos, target_value);
+        {
+            //  First, check the full-dimension, unconstrained solver, still
+            //  applying the cutoff limit as necessary to get an in-bounds 
+            // result.
+            for (auto cutoff_limit = 0; cutoff_limit <= N + 1; ++cutoff_limit)
+            {
+                auto bound_cutoff_to_use = bound_cutoff;
+                if (bound_cutoff == 0.) {
+                    cutoff_limit = N + 1;
+                    bound_cutoff_to_use = 1e-12;
+                }
+                auto sol = solve(target_pos, target_value, 
+                                 bound_cutoff_to_use, cutoff_limit);
 #ifdef LIBFIVE_VERBOSE_QEF_DEBUG
-            std::cout << "Got solution at [" << sol.position.transpose() << "]\n";
+                std::cout << "Got solution at [" << sol.position.transpose() << "]\n";
 #endif
-            if (region_.contains(sol.position, 0)) {
+                if (region_.contains(sol.position, 0)) {
 #ifdef LIBFIVE_VERBOSE_QEF_DEBUG
-                std::cout << "Got full-dimension solution\n";
+                    std::cout << "Got full-dimension solution\n";
 #endif
-                return sol;
+                    return sol;
+                }
             }
         }
 
@@ -369,7 +396,8 @@ public:
         //  every corner, picking the first case where the QEF solution
         //  doesn't escape the bounds).
         UnrollDimension<(int)N - 1>()(
-                *this, region_, target_pos, target_value, out);
+            *this, region_, target_pos, target_value, 
+            out, bound_cutoff);
 
         assert(!std::isinf(out.error));
         return out;
@@ -440,15 +468,24 @@ protected:
         void operator()(
                 const QEF<N>& qef, const Region<N>& region,
                 const Eigen::Matrix<double, 1, N>& target_pos,
-                double target_value, Solution& out)
+                double target_value, Solution& out,
+                double bound_cutoff, 
+                unsigned eigenvalue_cutoff_limit = 0)
         {
 #ifdef LIBFIVE_VERBOSE_QEF_DEBUG
             std::cout << "UnrollDimension<" << TargetDimension
                       << "> called with N = " << N <<"\n";
-#endif
+#endif      
 
+            assert(bound_cutoff >= 0.);
+            auto eigenvalue_cutoff_relative = bound_cutoff;
+            if (bound_cutoff == 0.) {
+                eigenvalue_cutoff_relative = 1e-12;
+                eigenvalue_cutoff_limit = TargetDimension + 1;
+            }
             UnrollSubspace<TargetDimension, ipow(3, N)>()(
-                qef, region, target_pos, target_value, out);
+                qef, region, target_pos, target_value, out,
+                eigenvalue_cutoff_relative, eigenvalue_cutoff_limit);
 
 #ifdef LIBFIVE_VERBOSE_QEF_DEBUG
             std::cout << "Done unrolling subspace\n";
@@ -463,8 +500,36 @@ protected:
                 // Reset the error value, then try the next dimension down
                 out.error = std::numeric_limits<double>::infinity();
 
-                UnrollDimension<TargetDimension - 1, Dummy>()(
-                        qef, region, target_pos, target_value, out);
+                auto source_rank = out.rank + TargetDimension - N;
+                assert(source_rank <= TargetDimension + 1);
+
+                // If the rank was 0, it should just use the mass point, 
+                // which should be inside the region.
+                assert(source_rank > 0);
+
+                // Set a new cutoff limit, that will reduce the rank to 
+                // source_rank - 1 (by being that much less than the matrix
+                // size).
+                auto new_cutoff_limit = TargetDimension + 2 - source_rank;
+
+                // We want to try again with this higher cutoff limit, but
+                // cannot do so if the source rank was 0 (as a higher limit
+                // merely reduces the source rank and we can't reduce it 
+                // further), or if the new limit would be no more than the one
+                // we already used (which will happen whenever the lack of
+                // greater cutoff is due to the numeric restriction on cutoffs
+                // and not the limit on cutoff count.)
+                if (source_rank > 0 && 
+                    new_cutoff_limit > eigenvalue_cutoff_limit) {
+                    operator()(qef, region, target_pos, target_value, out,
+                        bound_cutoff, new_cutoff_limit);
+                }
+                else {
+                    UnrollDimension<TargetDimension - 1, Dummy>()(
+                        qef, region, target_pos, target_value, out,
+                        bound_cutoff);
+
+                }
             }
         }
     };
@@ -474,7 +539,7 @@ protected:
     struct UnrollDimension<-1, Dummy> {
         void operator()(const QEF<N>&, const Region<N>&,
                         const Eigen::Matrix<double, 1, N>&,
-                        double, Solution&)
+                        double, Solution&, double)
         {
             // Terminate static unrolling here
         }
@@ -485,7 +550,9 @@ protected:
         void operator()(
                 const QEF<N>& qef, const Region<N>& region,
                 const Eigen::Matrix<double, 1, N>& target_pos,
-                double target_value, Solution& out)
+                double target_value, Solution& out, 
+                double eigenvalue_cutoff_relative, 
+                unsigned eigenvalue_cutoff_limit)
         {
             // If this neighbor is of the target dimension, then check for
             // an improved solution constrained to this neighbor.
@@ -497,7 +564,8 @@ protected:
 #endif
                 // Calculate the constrained solution, including error
                 const auto sol = qef.solveConstrained<TargetSubspace - 1>(
-                        region, target_pos, target_value);
+                        region, target_pos, target_value,
+                        eigenvalue_cutoff_relative, eigenvalue_cutoff_limit);
 
 #ifdef LIBFIVE_VERBOSE_QEF_DEBUG
                 std::cout << "  Got solution at " << sol.position.transpose() << " and error " << sol.error << "\n";
@@ -519,7 +587,8 @@ protected:
             // Statically unroll the loop across all neighbors
             // (keeping the target dimension constant)
             UnrollSubspace<TargetDimension, TargetSubspace - 1>()(
-                    qef, region, target_pos, target_value, out);
+                    qef, region, target_pos, target_value, out,
+                    eigenvalue_cutoff_relative, eigenvalue_cutoff_limit);
         }
     };
 
@@ -527,7 +596,8 @@ protected:
     template <unsigned TargetDimension>
     struct UnrollSubspace<TargetDimension, 0> {
         void operator()(const QEF<N>&, const Region<N>&,
-                        const Eigen::Matrix<double, 1, N>&, double, Solution&)
+                        const Eigen::Matrix<double, 1, N>&, double, Solution&,
+                        double, unsigned)
         {
             // Nothing to do here
         }
@@ -548,7 +618,8 @@ protected:
             const Vector& AtB,
             const Vector& target,
             const double eigenvalue_cutoff_relative=1e-12,
-            const double eigenvalue_cutoff_absolute=0)
+            const double eigenvalue_cutoff_absolute=0,
+            const unsigned eigenvalue_cutoff_limit = N + 1)
     {
         // Our high-level goal here is to find the pseduo-inverse of AtA,
         // with special handling for when it isn't of full rank.
@@ -558,14 +629,35 @@ protected:
         // Build the SVD's diagonal matrix, truncating near-singular eigenvalues
         Matrix D = Matrix::Zero();
         const double max_eigenvalue = eigenvalues.cwiseAbs().maxCoeff();
+        auto eigenvalue_cutoff = eigenvalue_cutoff_relative * max_eigenvalue;
+        if (!eigenvalue_cutoff_relative) {
+            eigenvalue_cutoff = eigenvalue_cutoff_absolute;
+        }
+        else if (eigenvalue_cutoff_absolute) {
+            eigenvalue_cutoff = 
+                std::min(eigenvalue_cutoff, eigenvalue_cutoff_absolute);
+        }
+
+        assert(eigenvalue_cutoff_limit <= N + 1);
+        if (eigenvalue_cutoff_limit < N + 1) {
+            if (eigenvalue_cutoff_limit == 0) {
+                eigenvalue_cutoff = 0;
+            }
+            else {
+                std::array<double, N + 1> absValues;
+                for (unsigned i = 0; i < N + 1; ++i) {
+                    absValues[i] = fabs(eigenvalues[i]);
+                }
+                std::sort(absValues.begin(), absValues.end());
+                eigenvalue_cutoff = std::min(
+                    eigenvalue_cutoff, absValues[eigenvalue_cutoff_limit - 1]);
+            }
+        }
 
         unsigned rank = 0;
         for (unsigned i=0; i < N + 1; ++i) {
             const auto e = fabs(eigenvalues[i]);
-            if ((eigenvalue_cutoff_relative &&
-                 e / max_eigenvalue > eigenvalue_cutoff_relative) ||
-                (eigenvalue_cutoff_absolute &&
-                 e > eigenvalue_cutoff_absolute))
+            if (e > eigenvalue_cutoff)
             {
                 D.diagonal()[i] = 1 / eigenvalues[i];
                 rank++;

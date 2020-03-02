@@ -108,7 +108,8 @@ public:
      */
     std::shared_ptr<Tape> evalInterval(Evaluator* eval,
                                        const std::shared_ptr<Tape>& tape,
-                                       Pool& object_pool);
+                                       Pool& object_pool,
+                                       const BRepSettings&);
 
     /*
      *  Evaluates a minimum-size octree node.
@@ -117,7 +118,8 @@ public:
     void evalLeaf(Evaluator* eval,
                   const std::shared_ptr<Tape>& tape,
                   Pool& spare_leafs,
-                  const HybridNeighbors<N>& neighbors);
+                  const HybridNeighbors<N>& neighbors,
+                  const BRepSettings&);
 
     /*
      *  If all children are present, then collapse cells based on error
@@ -128,7 +130,7 @@ public:
     bool collectChildren(Evaluator* eval,
                          const std::shared_ptr<Tape>& tape,
                          Pool& object_pool,
-                         double max_err);
+                         const BRepSettings& settings);
 
     /*  Looks up the cell's level for purposes of vertex placement,
      *  returning 0 or more for LEAF / EMPTY / FILLED cells (depending

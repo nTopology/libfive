@@ -750,7 +750,7 @@ TEST_CASE("Simplex meshing (gyroid performance breakdown)", "[!benchmark]")
 {
     Region<3> r({ -5, -5, -5 }, { 5, 5, 5 });
 
-    Root<SimplexTree<3>> t;
+    Root<const SimplexTree<3>> t;
 
     auto s = sphereGyroid();
 

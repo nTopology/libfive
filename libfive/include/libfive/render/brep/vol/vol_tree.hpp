@@ -20,6 +20,7 @@ namespace libfive {
 class Tape;
 class Evaluator;
 class VolNeighbors;
+struct BRepSettings;
 
 /*
  *  A VolTree is a very basic octre that stores filled / empty state of cells.
@@ -50,18 +51,17 @@ public:
      */
     std::shared_ptr<Tape> evalInterval(Evaluator* eval,
                                        const std::shared_ptr<Tape>& tape,
-                                       Pool& object_pool);
+                                       Pool&, const BRepSettings&);
 
     void evalLeaf(Evaluator* eval,
                   const std::shared_ptr<Tape>& tape,
-                  Pool& spare_leafs,
-                  const VolNeighbors& neighbors);
+                  Pool&, const VolNeighbors&, const BRepSettings&);
 
     /*  If all children are EMPTY / FILLED, merges them */
     bool collectChildren(Evaluator* eval,
                          const std::shared_ptr<Tape>& tape,
                          Pool& object_pool,
-                         double max_err);
+                         const BRepSettings& settings);
 
     /*
      *  Releases this tree to the given object pool

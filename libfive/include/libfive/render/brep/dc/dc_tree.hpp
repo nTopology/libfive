@@ -26,11 +26,12 @@ You can obtain one at http://mozilla.org/MPL/2.0/.
 
 namespace libfive {
 
-/* Forward declaration */
+/* Forward declarations */
 class Evaluator;
 class Tape;
 template <unsigned N> class Region;
 template <unsigned N> class DCNeighbors;
+struct BRepSettings;
 
 /*  AMBIGUOUS leaf cells have more data, which we heap-allocate in
  *  this struct to keep the overall tree smaller. */
@@ -112,7 +113,7 @@ public:
      */
     std::shared_ptr<Tape> evalInterval(Evaluator* eval,
                                        const std::shared_ptr<Tape>& tape,
-                                       Pool& object_pool);
+                                       Pool& object_pool, const BRepSettings&);
 
     /*
      *  Evaluates and stores a result at every corner of the cell.
@@ -122,7 +123,8 @@ public:
     void evalLeaf(Evaluator* eval,
                   const std::shared_ptr<Tape>& tape,
                   Pool& spare_leafs,
-                  const DCNeighbors<N>& neighbors);
+                  const DCNeighbors<N>& neighbors, 
+                  const BRepSettings&);
 
     /*
      *  If all children are present, then collapse based on the error
@@ -132,8 +134,8 @@ public:
      */
     bool collectChildren(Evaluator* eval,
                          const std::shared_ptr<Tape>& tape,
-                         Pool& object_pool,
-                         double max_err);
+                         Pool& object_pool, 
+                         const BRepSettings& settings);
 
     /*
      *  Returns the filled / empty state for the ith corner

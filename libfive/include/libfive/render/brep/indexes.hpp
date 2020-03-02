@@ -9,6 +9,8 @@ You can obtain one at http://mozilla.org/MPL/2.0/.
 #pragma once
 
 #include <cstdint>
+#include <assert.h>
+#include "libfive/render/brep/util.hpp"
 
 namespace libfive {
 
@@ -120,6 +122,45 @@ struct NeighborIndex {
         return floating() == 0;
     }
 
+    /*  Determines the absolute neighbor index that is contained in this
+     *  and has the specified position relative to it.  Result is undefined
+     *  if "relative" would represent an index in a higher dimension than
+     *  this, or if floating() has bitcount of at least 2 and the underlying
+     *  dimensionality is 4 or higher.*/
+    constexpr NeighborIndex fromRelativeToThis(NeighborIndex relative) {
+        assert(relative.i < ipow(3, dimension()));
+        if (relative.i == ipow(3, dimension()) - 1) {
+            // relative is the entire space of *this.
+            return *this;
+        }
+        else if (i == ipow(3, dimension()) - 1) {
+            // *this is the maximal subspace in its dimension, or is maximal
+            // for the first K axes and 0 after that. 
+            return relative;
+        }
+        else if (dimension() == 1) {
+            // *this is an edge, so the relative neighbor must be a corner.
+            auto newPos = pos();
+            if (relative.i == 1) {
+                newPos |= floating();
+            }
+            return fromPosAndFloating(newPos, 0);
+        }
+        else {
+            // This is a face.  We assume our dimensionality is 3; we have
+            // ruled out 2 or lower, and if we allow 4 or higher there is no
+            // way of determining which dimensions should come next.
+            auto axis = highestbit(fixed() & 7);
+            auto newPos = pos() | (relative.pos() << (axis + 1));
+            newPos |= newPos >> 3;
+            newPos &= 7;
+            auto newFloat = relative.floating() << (axis + 1);
+            newFloat |= newFloat >> 3;
+            newFloat &= 7;
+            return fromPosAndFloating(newPos, newFloat);
+        }
+    }
+
     /*
      *  Builds a NeighborIndex from pos and fixed (described above)
      */
@@ -129,6 +170,7 @@ struct NeighborIndex {
                 fromPosAndFloating(pos >> 1, floating >> 1).i * 3
             : 0);
     }
+
     int i;
 
 };

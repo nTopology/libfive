@@ -13,15 +13,15 @@ You can obtain one at http://mozilla.org/MPL/2.0/.
 
 namespace libfive {
 
-template <unsigned N>
-SimplexNeighbors<N>::SimplexNeighbors()
-    : Neighbors<N, SimplexTree<N>, SimplexNeighbors<N>>()
+template <unsigned N, class Leaf>
+SimplexNeighbors<N, Leaf>::SimplexNeighbors()
+    : Neighbors<N, SimplexTree<N, Leaf>, SimplexNeighbors<N, Leaf>>()
 {
     // Nothing to do here
 }
 
-template <unsigned N>
-SimplexLeafSubspace<N>* SimplexNeighbors<N>::getSubspace(NeighborIndex i) const
+template<unsigned N, class Leaf>
+SimplexLeafSubspace<N>* SimplexNeighbors<N, Leaf>::getSubspace(NeighborIndex i) const
 {
     SimplexLeafSubspace<N>* out = nullptr;
     for (const auto& t : NeighborTables<N>::neighborTable(i)) {
@@ -73,8 +73,8 @@ SimplexLeafSubspace<N>* SimplexNeighbors<N>::getSubspace(NeighborIndex i) const
     return out;
 }
 
-template <unsigned N>
-std::pair<const SimplexLeaf<N>*, NeighborIndex> SimplexNeighbors<N>::check(NeighborIndex i) const
+template<unsigned N, class Leaf>
+std::pair<const Leaf*, NeighborIndex> SimplexNeighbors<N, Leaf>::check(NeighborIndex i) const
 {
     for (const auto& t : NeighborTables<N>::neighborTable(i)) {
         const auto n = this->neighbors[t.first.i];

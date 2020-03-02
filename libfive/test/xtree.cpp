@@ -149,7 +149,7 @@ TEST_CASE("DCTree<2>::vertex_count")
 
 TEST_CASE("DCTree<3>::vert")
 {
-    auto walk = [](Root<DCTree<3>>& xtree,
+    auto walk = [](Root<const DCTree<3>>& xtree,
                    Evaluator& eval, float err)
     {
         std::list<const DCTree<3>*> todo = {xtree.get()};

@@ -15,7 +15,10 @@ You can obtain one at http://mozilla.org/MPL/2.0/.
 namespace libfive {
 
 template <typename T>
-class Root
+class Root;
+
+template <typename T>
+class Root<const T>
 {
 public:
     Root() : ptr(nullptr) {}
@@ -45,6 +48,8 @@ public:
     const T* operator->() const { return ptr; }
     const T* get() const { return ptr; }
 
+    typename T::Pool& pool() { return object_pool; }
+
     void claim(typename T::Pool& pool) {
         tree_count += pool.size();
         object_pool.claim(pool);
@@ -61,6 +66,19 @@ protected:
     // result to go negative (if one pool has claimed many trees from
     // another Pool, so it owns more trees than it has allocated).
     int64_t tree_count=0;
+};
+
+template <typename T>
+class Root : public Root<const T>
+{
+public:
+    Root() : Root<const T>(nullptr) {}
+    Root(T* ptr) : Root<const T>(ptr) {}
+    Root(Root && other) = default;
+    Root& operator=(Root && other) = default;
+
+    T* operator->() const { return this->ptr; }
+    T* get() const { return this->ptr; }
 };
 
 }   // namespace libfive
