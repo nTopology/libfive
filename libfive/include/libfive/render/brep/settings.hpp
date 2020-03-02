@@ -22,6 +22,7 @@ enum BRepAlgorithm {
     DUAL_CONTOURING,
     ISO_SIMPLEX,
     HYBRID,
+    SIMPLEX_DC,
 };
 
 struct BRepSettings {
@@ -56,7 +57,7 @@ public:
      *  platform-default number of threads. */
     unsigned workers;
 
-    /*  This is the meshing algorti */
+    /*  This is the meshing algorithm */
     BRepAlgorithm alg;
 
     /*  Optional function called when a thread finds itself without anything

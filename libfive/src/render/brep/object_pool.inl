@@ -98,10 +98,12 @@ static void claimVector(
 template <typename T, typename... Ts>
 void ObjectPool<T, Ts...>::claim(ObjectPool<T, Ts...>& other)
 {
-    claimVector(allocated_blocks, other.allocated_blocks);
-    claimVector(fresh_blocks, other.fresh_blocks);
-    claimVector(reusable_objects, other.reusable_objects);
-
+    {
+        std::unique_lock lock(mMutex);
+        claimVector(allocated_blocks, other.allocated_blocks);
+        claimVector(fresh_blocks, other.fresh_blocks);
+        claimVector(reusable_objects, other.reusable_objects);
+    }
     next().claim(other.next());
 }
 

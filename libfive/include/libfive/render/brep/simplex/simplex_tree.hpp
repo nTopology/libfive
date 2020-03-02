@@ -30,7 +30,8 @@ You can obtain one at http://mozilla.org/MPL/2.0/.
 namespace libfive {
 
 /* Forward declarations */
-template <unsigned N> class SimplexNeighbors;
+template <unsigned N, class Leaf> class SimplexNeighbors;
+template<unsigned N, class Leaf> class SimplexTree;
 template <unsigned N> class Region;
 struct BRepSettings;
 
@@ -58,6 +59,16 @@ struct SimplexLeafSubspace {
      *  the pool while they're still in use.  */
     std::atomic<uint32_t> refcount;
 
+    /*  In Simplex DC meshing, it is possible for one subspace vertex to be
+     *  collapsed into another one.  This tracks that collapsing; it uses
+     *  the same ternary method as subs, but includes only those axes that
+     *  are floating in this sub; in the case of a face in 3 dimensions, the
+     *  ordering of the axes for this purpose is Q(A), R(A), where A is the 
+     *  axis of the face.*/
+    unsigned collapseRef;
+
+    std::array<int, 2> faceEdgeCheckResult; // For debugging, remove.
+
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
@@ -68,6 +79,11 @@ struct SimplexLeaf
     void reset();
 
     using Pool = ObjectPool<SimplexLeaf, SimplexLeafSubspace<N>>;
+
+    using ParentPool = ObjectPool<SimplexTree<N, SimplexLeaf>, 
+                                  SimplexLeaf, 
+                                  SimplexLeafSubspace<N>>;
+
     void releaseTo(Pool& object_pool);
 
     /*  One QEF structure per subspace in the leaf, shared between neighbors.
@@ -92,15 +108,15 @@ struct SimplexLeaf
 
     /*  Represents how far from minimum-size leafs we are */
     unsigned level;
+
+    constexpr static double qefShrink = 1. - 1e-9;
 };
 
-template <unsigned N>
-class SimplexTree : public XTree<N, SimplexTree<N>, SimplexLeaf<N>>
+template <unsigned N, class Leaf = SimplexLeaf<N>>
+class SimplexTree : public XTree<N, SimplexTree<N, Leaf>, Leaf>
 {
 public:
-    using Pool = ObjectPool<SimplexTree<N>,
-                            SimplexLeaf<N>,
-                            SimplexLeafSubspace<N>>;
+  using Pool = typename Leaf::ParentPool;
 
     /*
      *  Simple constructor
@@ -113,15 +129,16 @@ public:
     /*
      *  Complete constructor
      */
-    explicit SimplexTree(SimplexTree<N>* parent, unsigned index,
+    explicit SimplexTree(SimplexTree<N, Leaf>* parent, unsigned index,
                          const Region<N>&);
 
     /*
      *  Constructs an empty SimplexTree
      *
-     *  This only exists for API completeness, and should never
-     *  be called.  The returned tree has an invalid parent pointer
-     *  and Interval::UNKNOWN as its type.
+     *  This is called during dual walking, to represent the trees outside
+     *  the original bounding box.  The returned tree has an invalid parent 
+     *  pointer and Interval::UNKNOWN as its type, and therefore must be
+     *  handled accordingly by the walker.
      */
     static std::unique_ptr<SimplexTree> empty();
 
@@ -143,7 +160,7 @@ public:
     void evalLeaf(Evaluator* eval,
                   const std::shared_ptr<Tape>& tape,
                   Pool& object_pool,
-                  const SimplexNeighbors<N>& neighbors);
+                  const SimplexNeighbors<N, Leaf>& neighbors);
 
     /*
      *  If all children are present, then collapse based on the error
@@ -190,18 +207,18 @@ public:
     typedef Eigen::Matrix<double, N, 1> Vec;
 
     static bool hasSingletons() { return false; }
-    static SimplexTree<N>* singletonEmpty() { return nullptr; }
-    static SimplexTree<N>* singletonFilled() { return nullptr; }
-    static bool isSingleton(const SimplexTree<N>*) { return false; }
+    static SimplexTree<N, Leaf>* singletonEmpty() { return nullptr; }
+    static SimplexTree<N, Leaf>* singletonFilled() { return nullptr; }
+    static bool isSingleton(const SimplexTree<N, Leaf>*) { return false; }
 
-protected:
     /*
      *  Calculate and store whether each vertex is inside or outside
      *  This populates leaf->sub[i]->inside, for i in 0..ipow(3, N)
      */
     void saveVertexSigns(Evaluator* eval,
-                         const Tape::Handle& tape,
-                         const std::array<bool, ipow(3, N)>& already_solved);
+        const Tape::Handle& tape,
+        const std::array<bool, ipow(3, N)>& already_solved);
+protected:
 
     /*
      *  Sets this->type to EMPTY / FILLED / AMBIGUOUS depending on
@@ -220,7 +237,7 @@ protected:
     void findLeafVertices(Evaluator* eval,
                           const Tape::Handle& tape,
                           Pool& object_pool,
-                          const SimplexNeighbors<N>& neighbors);
+                          const SimplexNeighbors<N, Leaf>& neighbors);
 
     /*
      *  Unwraps the atomic pointers, returning an array of plain pointers

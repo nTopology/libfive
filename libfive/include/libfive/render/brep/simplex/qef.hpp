@@ -321,7 +321,7 @@ public:
      *  This is implemented by walking down in dimensionality from N to 0,
      *  picking the lowest-error solution available that is within the bounds.
      */
-    Solution solveBounded(const Region<N>& region, double shrink=(1 - 1e-9))
+    Solution solveBounded(const Region<N>& region, double shrink)
     {
         return solveBounded(region, shrink,
                             (region.lower + region.upper) / 2.0,

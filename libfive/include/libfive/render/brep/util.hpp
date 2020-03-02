@@ -14,3 +14,7 @@ static constexpr unsigned ipow(unsigned p, unsigned n)
 
 static constexpr unsigned bitcount(unsigned p)
 { return (p == 0) ? 0 : ((p & 1) + bitcount(p >> 1)); }
+
+/*  Returns 0 for argument 0, though this should not be used.*/
+static constexpr unsigned highestbit (unsigned p)
+{ return (p <= 1) ? 0 : highestbit(p >> 1) + 1; }
