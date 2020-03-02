@@ -21,16 +21,29 @@ class Mesh;
 class DCMesher {
 public:
     using Output = Mesh;
-    using Input = DCTree<3>;
+    using PerThreadOutput = PerThreadBRep<3>;
+    using Input = const DCTree<3>;
 
     DCMesher(PerThreadBRep<3>& m) : m(m)
         {   /* Nothing to do here */    }
+
+    /* Empty cell loader, called by Dual::walk */
+    void load(Input* input) {}
 
     /*
      *  Called by Dual::walk to construct the triangle mesh
      */
     template <Axis::Axis A>
     void load(const std::array<const DCTree<3>*, 4>& ts);
+
+    /*
+     *  Empty face loader, called by Dual::walk
+     */
+    template <Axis::Axis A>
+    void load(const std::array<const DCTree<3>*, 2>& ts) {}
+
+    /* Empty corner loader */
+    void load(const std::array<const DCTree<3>*, 8> & ts) {}
 
     /*
      *  DC meshing doesn't need to handle the top edges of the tree

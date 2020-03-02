@@ -110,7 +110,7 @@ TEST_CASE("Mesh::render (early destruction of progress watcher)")
 {
     Region<3> r({ -5, -5, -5 }, { 5, 5, 5 });
 
-    Root<DCTree<3>> t;
+    Root<const DCTree<3>> t;
     BRepSettings settings;
     settings.min_feature = 0.25;
     {

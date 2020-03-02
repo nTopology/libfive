@@ -64,6 +64,14 @@ const T* XTree<N, T, L>::child(unsigned i) const
         : static_cast<const T*>(this);
 }
 
+template<unsigned N, typename T, typename L>
+T* XTree<N, T, L>::child(unsigned i)
+{
+    return isBranch()
+        ? children[i].load(std::memory_order_relaxed)
+        : static_cast<T*>(this);
+}
+
 template <unsigned N, typename T, typename L>
 void XTree<N, T, L>::resetPending() const
 {

@@ -43,6 +43,7 @@ public:
      *  Looks up a child, returning *this if this isn't a branch
      */
     const T* child(unsigned i) const;
+    T* child(unsigned i);
 
     /*
      *  Walks the tree, resetting pending to its initial value of (1 << N) - 1

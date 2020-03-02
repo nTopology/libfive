@@ -245,7 +245,7 @@ void print_debug_leaf(const HybridTree<N>* t) {
     }
 }
 
-void save_debug_mesh(const Tree c, const Root<HybridTree<3>>& t,
+void save_debug_mesh(const Tree c, const Root<const HybridTree<3>>& t,
                      const BRepSettings& settings, const Mesh* m)
 {
     m->saveSTL("out.stl");

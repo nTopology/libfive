@@ -11,7 +11,7 @@ You can obtain one at http://mozilla.org/MPL/2.0/.
 #include "../object_pool.inl"
 
 namespace libfive {
-template class SimplexTree<2>;
+template class SimplexTree<2, SimplexLeaf<2>>;
 template struct SimplexLeaf<2>;
 template struct SimplexLeafSubspace<2>;
 }   // namespace libfive

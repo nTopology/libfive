@@ -12,6 +12,7 @@ You can obtain one at http://mozilla.org/MPL/2.0/.
 #include <vector>
 #include <list>
 #include <cassert>
+#include <mutex>
 
 namespace libfive {
 class ProgressHandler;
@@ -39,6 +40,8 @@ public:
     void reset(unsigned, ProgressHandler*) {}
     int64_t num_blocks() const { return 0; }
     ObjectPool<>& operator=(ObjectPool<>&&) { return *this; }
+    ObjectPool(ObjectPool<>&&) {}
+    ObjectPool() = default;
 };
 
 template <typename T, typename... Ts>
@@ -46,6 +49,11 @@ class ObjectPool<T, Ts...> : public ObjectPool<Ts...>
 {
 public:
     ObjectPool<T, Ts...>& operator=(ObjectPool<T, Ts...>&& other);
+
+    ObjectPool<T, Ts...>(ObjectPool<T, Ts...>&& other)
+    { *this = std::move(other); }
+
+    ObjectPool<T, Ts...>() = default;
 
     template <typename... Args>
     T* get(Args... args);
@@ -57,6 +65,9 @@ public:
 
     ~ObjectPool();
 
+    /*  Claims another ObjectPool of the same type, adding its allocated
+     *  objects to those of this.  This operation is thread-safe on *this,
+     *  but not on other.*/
     void claim(ObjectPool<T, Ts...>& other);
 
     /*
@@ -92,6 +103,10 @@ private:
     /*  allocated_blocks is the master list of allocated blocks,
      *  which must be fully used (otherwise they'd be in fresh_blocks) */
     std::vector<T*> allocated_blocks;
+
+    /*  Mutex used when claiming.  May later be replaced with the use of
+     *  lock-free stacks instead of vectors.*/
+    std::mutex mMutex;
 
     static const unsigned N=512;
 };
