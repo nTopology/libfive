@@ -36,7 +36,7 @@ public:
         min_feature = 0.1;
         max_err = 1e-8;
         workers = 8;
-        alg = DUAL_CONTOURING;
+        alg = SIMPLEX_DC;
         free_thread_handler = nullptr;
         progress_handler = nullptr;
         cancel.store(false);
@@ -57,7 +57,7 @@ public:
      *  platform-default number of threads. */
     unsigned workers;
 
-    /*  This is the meshing algorti */
+    /*  This is the meshing algorithm */
     BRepAlgorithm alg;
 
     /*  Optional function called when a thread finds itself without anything
