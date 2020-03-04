@@ -42,7 +42,7 @@ SimplexQEF<N>::SimplexQEF(Eigen::Matrix<double, N, N + 1>&& vertices) :
                 perp = diff1.cross(diff2);
             }
             auto val = perp.dot(shiftedVert(1));
-            assert(val != perp.dot(vertices.col(i))); // If it is, our simplex
+//            assert(val != perp.dot(vertices.col(i))); // If it is, our simplex
                                                       // is degenerate.
             if (i == N && val < perp.dot(vertices.col(N))) {
                 // perp causes vertices[N] to be higher than our constant
@@ -241,7 +241,7 @@ typename SimplexQEF<N>::PointOpt SimplexQEF<N>::solveFromMask(
             auto constraintResult = constraints[i].val(result);
             auto constraintMask = 1 << (current_mask | shifted);
             if (constraintResult > 0) {
-                assert(bitcount(current_mask) < N);
+//                assert(bitcount(current_mask) < N);
                 failedConstraint = true;
                 nextMasksAllValid &= ~constraintMask;
             }
@@ -301,12 +301,12 @@ inline typename SimplexQEF<N>::Point SimplexQEF<N>::solve() const
         nextMasksAnyValid = 0;
         nextMasksAllValid = unsigned(-1);
         ++maskBitCount;
-        assert(maskBitCount <= N);
+//        assert(maskBitCount <= N);
     }
 
     // We should not reach this point unless the geometric algorithm has
     // gone awry.
-    assert(false);
+//    assert(false);
     return massPoint();
 }
 
