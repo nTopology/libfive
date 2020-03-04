@@ -71,8 +71,9 @@ void SimplexDCVertexer<N>::load(const std::array<Input*, 1 << (N - 1)> & ts)
                 continue;
             }
             auto faceAxis = (i & 2) ? R(A) : Q(A);
+            bool isUpperToFace(bestCellIdx & faceAxis);
             auto faceSubspaceIndex = 
-                26 - ipow(3, Axis::toIndex(faceAxis)) * ((i & 1) + 1);
+                26 - ipow(3, Axis::toIndex(faceAxis)) * (isUpperToFace + 1);
             faceSubs[i] = ts[bestCellIdx]->leaf->sub[faceSubspaceIndex].load();
         }
     }

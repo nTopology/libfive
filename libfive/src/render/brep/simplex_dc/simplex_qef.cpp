@@ -29,7 +29,7 @@ SimplexQEF<N>::SimplexQEF(Eigen::Matrix<double, N, N + 1>&& vertices) :
         // side of the simplex and therefore minimize the effect of numeric
         // error.
         auto negateAtN = false;
-        for (auto i = N; i >= 0; ++i) {
+        for (int i = N; i >= 0; --i) {
             auto shiftedVert = [&](int idx)
             {return vertices.col((i + idx) % (N + 1)); };
             auto diff1 = shiftedVert(2) - shiftedVert(1);
@@ -148,14 +148,14 @@ const SimplexQEF<N - bitcount(mask)>& SimplexQEF<N>::sub() const
                 // applying elements from AtA to AtB, and they are on opposite
                 // sides of the equation (which we are trying to solve)
                 // AtAx=AtB; if moved to the same side, one would be negated.
-                outVal.AtB += reducedFromAtA.transpose() * reduced[N];
-                outVal.AtB -= AtA(axis, axis) * reducedHead * reduced[N];
+                outVal.AtB += reducedFromAtA.transpose() * reduced[N - 1];
+                outVal.AtB -= AtA(axis, axis) * reducedHead * reduced[N - 1];
                 outVal.AtB = outVal.AtB.eval();
             }
 
             outVal.BtB = BtB; 
-            outVal.BtB += AtA(axis, axis) * reduced[N] * reduced[N];
-            outVal.BtB += 2 * AtB[axis] * reduced[N];
+            outVal.BtB += AtA(axis, axis) * reduced[N - 1] * reduced[N - 1];
+            outVal.BtB += 2 * AtB[axis] * reduced[N - 1];
 
             for (auto idx = 0, newIdx = 0; idx < constraints.size(); ++idx) {
                 if (idx == highBit) {
@@ -164,13 +164,13 @@ const SimplexQEF<N - bitcount(mask)>& SimplexQEF<N>::sub() const
                 auto& matrix = outVal.constraints[newIdx].matrix;
                 const auto& oldMatrix = constraints[idx].matrix;
                 matrix << oldMatrix.head(axis), oldMatrix.tail(N - axis);
-                matrix -= oldMatrix[N] * reduced;
+                matrix -= oldMatrix[axis] * reduced;
                 ++newIdx;
             }
 
             outVal.mass_point << 
                 mass_point.head(axis), mass_point.tail(N - axis);
-            outVal.mass_point -= mass_point[N] * reduced;
+            outVal.mass_point -= mass_point[axis] * reduced;
 
             // We don't need to copy the rank, since we won't be adding 
             // intersections directly to the subspace QEF.            
@@ -281,12 +281,14 @@ inline typename SimplexQEF<N>::Point SimplexQEF<N>::solve() const
     unsigned currentMasks = 1;
     unsigned nextMasksAnyValid = 0;
     unsigned nextMasksAllValid = unsigned(-1);
-    auto maskBitCount = 1; // For debugging only.
+    auto maskBitCount = 0; // For debugging only.
     while (currentMasks != 0) {
         for (auto i = 0; i < 8 * sizeof(unsigned); ++i) {
             if (1 << i & currentMasks) {
                 assert(bitcount(i) == maskBitCount);
-                assert(highestbit(i) <= N + 1);
+                if (i != 0) {
+                    assert(highestbit(i) <= N + 1);
+                }
             }
         }
         auto point = solveFromMask<0>(
@@ -325,7 +327,7 @@ typename SimplexQEF<N>::Vector SimplexQEF<N>::solveRaw() const
     // to truncate near-singular eigenvalues.
     Matrix D = Matrix::Zero();
 
-    for (unsigned i = 0; i < N + 1; ++i) {
+    for (unsigned i = 0; i < N; ++i) {
         if (eigenvalues[i] != 0)
         {
             D.diagonal()[i] = 1 / eigenvalues[i];

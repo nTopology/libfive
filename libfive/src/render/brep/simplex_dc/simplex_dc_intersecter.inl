@@ -444,6 +444,7 @@ void SimplexDCIntersecter<N>::load(const std::array<Input*, 1 << N>& ts)
 
     // Now handle edges between cell vertices and our corner vertex.
     std::array<SimplexDCIntersection<N>*, 1 << N> intersectForDup;
+    intersectForDup.fill(nullptr);
     for (auto cell = 0; cell < ts.size(); ++cell) {
         if (ts[cell]->type == Interval::UNKNOWN) {
             continue;
