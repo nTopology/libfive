@@ -58,11 +58,12 @@ void SimplexDCMesher::load(const std::array<Input*, 2>& ts)
                     edgeAxis, A, edgePos == 1, index == 0);
                 for (auto cornerIdx = 0; cornerIdx < 2; ++cornerIdx) {
                     auto cornerPos = (cornerIdx + edgeDirection + 1) % 2;
-                    auto corner = axisIdx == 0 ? edgePos + 2 * cornerPos 
-                                               : 2 * edgePos + cornerPos;
+                    auto corner = axisIdx == 0 ? 2 * edgePos + cornerPos
+                                               : edgePos + 2 * cornerPos;
                     auto pushSimplex = [&](SimplexDCMinEdge<3>* edge) {
                         auto& simplex = edge->simplexWithFaceReducedCell(
-                            edgeAxis, A, edgePos == 1, corner);
+                            edgeAxis, A, cell == 1, corner);
+                        assert(simplex.index.load() != 0);
                         simplices.push_back(&simplex);
                     };
                     if (std::holds_alternative<SimplexDCMinEdge<3>*>(edge)) {
@@ -133,7 +134,7 @@ void SimplexDCMesher::load(const std::array<Input*, 4>& ts)
         auto faceAxis = (faceAxisIdx == 0) ? Axis::Q(A) : Axis::R(A);
         for (auto facePosition = 0; facePosition < 2; ++facePosition) {
             auto indexA = facePosition == 0 ? 0 : 3;
-            auto indexB = indexA ^ faceAxis;
+            auto indexB = indexA ^ (1 << faceAxisIdx);
             if (ts[indexA] == ts[indexB]) {
                 // Due to a merged cell, there is no face in that direction
                 // (not even one extending beyond this edge).
@@ -228,7 +229,8 @@ void SimplexDCMesher::load(const std::array<Input*, 4>& ts)
             }
             auto corner = (i & 1) ^ (i >> 1);
             auto& simplex = std::get<SimplexDCMinEdge<3>*>(edge)
-                ->simplex(A, faceAxis, cell, corner);
+                ->simplexWithEdgeReducedCell(A, faceAxis, cell, corner);
+            assert(simplex.index.load() != 0);
             simplices[i] = &simplex;
         }
 
@@ -253,7 +255,7 @@ void SimplexDCMesher::load(const std::array<Input*, 8>& ts) {
         [](const Input* a, const Input* b)
     { return a->leafLevel() < b->leafLevel(); }) - ts.begin();
 
-    auto cornerSubspaceIndex = CornerIndex(index).neighbor().i;
+    auto cornerSubspaceIndex = CornerIndex(7 - index).neighbor().i;
 
     const auto& cornerSub = *ts[index]->leaf->sub[cornerSubspaceIndex].load();
     constexpr std::array tsIndices{ 0, 1, 2, 3, 4, 5, 6, 7 };
@@ -313,19 +315,39 @@ void SimplexDCMesher::load(const std::array<Input*, 8>& ts) {
             // edgeAxis, and reverse afterward if that would be looking from
             // the inside out; we start at the low cell, clockwise face.
 
-            std::array<const DCSimplex<3>*, 8> simplices;
+            boost::container::static_vector<const DCSimplex<3>*, 8> simplices;
             for (auto cellNum = 0; cellNum < 4; ++cellNum) {
                 // Our index with respect to the edge is not cellNum,
                 // since going counterclockwise means we need the order 
                 // 0,1,3,2.
                 auto cellIdx = cellNum ^ (cellNum >> 1);
                 auto QIsCounterClockwise = (cellIdx == 0 || cellIdx == 3);
+                auto fullCellIdx = cellIdx << 1;
+                if (edgePosition == 1) {
+                    fullCellIdx |= 1;
+                }
+                fullCellIdx <<= edgeAxisIdx;
+                fullCellIdx |= (fullCellIdx >> 3);
+                fullCellIdx &= 7;
+                if (ts[fullCellIdx]->type == Interval::UNKNOWN) {
+                    // This would imply that we have two points on the
+                    // boundary of our original region (the edge vertex
+                    // and corner vertex), of which one is inside and
+                    // one is outside.
+                    assert(false);
+                    continue;
+                }
                 for (auto CCFace : { 0, 1 }) {
                     auto faceAxis = (QIsCounterClockwise == bool(CCFace))
                         ? Axis::Q(edgeAxis) : Axis::R(edgeAxis);
+                    if (ts[fullCellIdx] == ts[fullCellIdx ^ faceAxis]) {
+                        // There is a merged cell, so this face does not exist.
+                        continue;
+                    }
                     auto& simplex = edge->simplexWithEdgeReducedCell(
                         edgeAxis, faceAxis, cellIdx, !bool(edgePosition));
-                    simplices[cellNum * 2 + CCFace] = &simplex;
+                    assert(simplex.index.load() != 0);
+                    simplices.push_back(&simplex);
                 }
             }
 
@@ -407,10 +429,13 @@ void SimplexDCMesher::load(const std::array<Input*, 8>& ts) {
                     }
                     auto edgeAxis = (edgeAxisIdx == 0) ? Axis::Q(faceAxis)
                                                        : Axis::R(faceAxis);
-                    bool edgePosition(facePosition & (1 << edgeAxisIdx));
-                    auto& edge = edges[edgeAxisIdx * 2 + edgePosition];
+                    bool edgePosition(facePositionToUse & (1 << edgeAxisIdx));
+                    auto& edge = 
+                        edges[Axis::toIndex(edgeAxis) * 2 + edgePosition];
+                    assert(edge != nullptr);
+
                     auto& simplex = edge->simplexWithFaceReducedCell(
-                        edgeAxis, faceAxis, cell, 3 - facePosition);
+                        edgeAxis, faceAxis, cell, 3 - facePositionToUse);
                     simplices[cell * 2 + edgeIdx] = &simplex;
                 }
             }
@@ -464,6 +489,10 @@ void SimplexDCMesher::load(const std::array<Input*, 8>& ts) {
                 auto edgeAxis = Axis::toAxis(edgeAxisIdx);
                 auto edgePosition = bool(cell & edgeAxis);
                 auto edge = edges[edgeAxisIdx * 2 + edgePosition];
+                // This edge must exist, as if it were internal to a face or
+                // cell, every cell bordering it would be duplicate if not
+                // quadrupled.
+                assert(edge != nullptr);                
                 for (auto faceAxisIdx : { 0, 1 }) {
                     auto faceAxis = (faceAxisIdx == 0) ? Axis::Q(edgeAxis)
                         : Axis::R(edgeAxis);
@@ -553,7 +582,7 @@ void SimplexDCMesher::load(const std::array<Input*, 8>& ts) {
                     auto useQ = bool(edgeAxisIdx) == QIsCC;
                     auto edgeAxis = useQ ? Axis::Q(faceAxis) : Axis::R(faceAxis);
                     auto edgeAxisIdx = Axis::toIndex(edgeAxis);
-                    auto edgePos = reducedCell & (useQ ? 1 : 2);
+                    bool edgePos(reducedCell & (useQ ? 1 : 2));
                     auto edge = edges[edgeAxisIdx * 2 + edgePos];
                     if (edge == nullptr) {
                         // The edge does not exist.
@@ -582,7 +611,11 @@ template<class Container>
 void SimplexDCMesher::addPolygon(const Container& simplices)
 {
     assert(simplices.size() >= 3);
-    auto getIndex = [](auto iter) {return (*iter)->index.load(); };
+    auto getIndex = [](auto iter) {
+        auto out = (*iter)->index.load();
+        assert(out != 0);
+        return out;
+    };
     // For now, just use the first point with every pair of others.  Later, we may want
     // to use the intersection mass point for a neater and more robust triangulation.
     for (auto iter1 = simplices.begin() + 1; iter1 != simplices.end(); ++iter1) {
