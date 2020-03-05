@@ -56,7 +56,7 @@ void SimplexDCVertexer<N>::load(const std::array<Input*, 1 << (N - 1)> & ts)
 
     if constexpr (N == 3) {
         for (auto i = 0; i < 4; ++i) {
-            auto cellIdxA = i & 1 ? 0 : 3;
+            auto cellIdxA = i & 1 ? 3 : 0;
             auto cellIdxB = cellIdxA ^ (i & 2 ? 2 : 1);
             if (ts[cellIdxA] == ts[cellIdxB]) {
                 // The face is interior to a merged cell and hence
@@ -93,7 +93,7 @@ void SimplexDCVertexer<N>::load(const std::array<Input*, 1 << (N - 1)> & ts)
             if (N == 3 && faceSubs[faceSubIdx] == nullptr) {
                 // Face does not exist, so neither does the simplex we'd be
                 // handling.
-                return;
+                continue;
             }
             for (auto corner = 0; corner < 2; ++corner) {
                 auto& simplex = edge.simplexWithEdgeReducedCell(

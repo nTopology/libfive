@@ -125,8 +125,8 @@ std::unique_ptr<Mesh> Mesh::render(
     }
     else if (settings.alg == SIMPLEX_DC) {
         if (settings.progress_handler) {
-            // Pool::build, Dual::walk, t->assignIndices, t.reset
-            settings.progress_handler->start({ 1, 1, 1, 1, 1 });
+            // Pool::build, Edges, Intersecter, Vertexer, Mesher, t.reset
+            settings.progress_handler->start({ 1, 1, 1, 1, 1, 1 });
             auto t = SimplexDCWorkerPool<3>::build(es, r, settings);
             if (settings.cancel.load() || t.get() == nullptr) {
                 if (settings.progress_handler) {

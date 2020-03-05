@@ -303,6 +303,9 @@ inline constexpr DCSimplex<N>& SimplexDCMinEdge<N>::simplexWithFaceReducedCell(
     auto shiftValue = Axis::toIndex(faceAxis) + 1;
     auto fullCorner = reducedCorner << shiftValue;
     fullCorner |= (reducedCorner >> (N - shiftValue));
+    if (!isUpperCell) {
+        fullCorner |= faceAxis;
+    }
     auto cell = (~fullCorner) & lowestBits(N);
     return simplex(edgeAxis, faceAxis, cell, bool(fullCorner & edgeAxis));
 }
