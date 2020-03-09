@@ -48,6 +48,9 @@ void SimplexLeafSubspace<N>::reset()
     vert.array() = 0.0;
     qef.reset();
     refcount.store(0);
+    for (auto& src : cornerCellSources) {
+        src.store(0);
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////

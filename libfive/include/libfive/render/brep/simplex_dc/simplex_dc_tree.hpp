@@ -67,6 +67,12 @@ struct DCSimplex
     std::pair<const SimplexDCIntersection<N>*, bool> insertIntersection(
         unsigned a, unsigned b, SimplexDCIntersection<N>* intersection);
 
+    /* Number of non-null intersections, for assertions/debugging.*/
+    int intersectionCount() const {
+        return std::count_if(intersections.begin(), intersections.end(),
+            [](const auto& atomic_ptr) {return atomic_ptr.load() != nullptr; });
+    }
+
     /*  Simplex vertex position */
     Eigen::Matrix<double, N, 1> vert;
 

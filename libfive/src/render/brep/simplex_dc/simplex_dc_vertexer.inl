@@ -98,6 +98,14 @@ void SimplexDCVertexer<N>::load(const std::array<Input*, 1 << (N - 1)> & ts)
             for (auto corner = 0; corner < 2; ++corner) {
                 auto& simplex = edge.simplexWithEdgeReducedCell(
                     A, faceAxis, cellIdx, corner);
+                assert(simplex.intersectionCount() == 3 ||
+                    simplex.intersectionCount() == 4 ||
+                    simplex.intersectionCount() == 0);
+                if (!(simplex.intersectionCount() == 3 ||
+                    simplex.intersectionCount() == 4 ||
+                    simplex.intersectionCount() == 0)) {
+                    throw& simplex;
+                }
                 auto getVerts = [&]()->SubspaceVertArray {
                     if constexpr (N == 3) {
                         return { cornerSubs[corner], edgeSub, 
@@ -118,8 +126,20 @@ void SimplexDCVertexer<N>::calcAndStoreVert(
     DCSimplex<N>& simplex, SubspaceVertArray vertsFromSubspaces)
 {
     Eigen::Matrix<double, N, N + 1> vertices;
+    auto state = 0; // Bit 1 for inside, bit 2 for empty.
     for (auto i = 0; i <= N; ++i) {
+        if (vertsFromSubspaces[i]->inside) {
+            state |= 1;
+        }
+        else {
+            state |= 2;
+        }
         vertices.col(i) = vertsFromSubspaces[i]->vert;
+    }
+    if (state != 3) {
+        assert(state == 1 || state == 2);
+        return; // No point in making a vertex if the simplex is all
+                // filled or all empty.
     }
 
     SimplexQEF<N> qef(std::move(vertices));

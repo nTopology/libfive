@@ -14,62 +14,73 @@ You can obtain one at http://mozilla.org/MPL/2.0/.
 namespace libfive {
 
 template <unsigned N>
-SimplexQEF<N>::SimplexQEF(Eigen::Matrix<double, N, N + 1>&& vertices) :
-    AtA(Matrix::Zero()), AtB(Vector::Zero()), BtB(0.)
+SimplexQEF<N>::SimplexQEF(Eigen::Matrix<double, N, N + 1>&& vertices, 
+                          double padding) :
+    AtA(Matrix::Zero()), AtB(Vector::Zero()), BtB(0.), 
+    mass_point(Eigen::Matrix<double, N + 1, 1>::Zero())
 {
-    if constexpr (N == 2 || N == 3) {
-        auto center = vertices.rowwise().mean();
-        auto diff = (vertices.colwise() - center).eval();
-        vertices -= constraintPadding * diff;
+    auto center = vertices.rowwise().mean();
+    auto diff = (vertices.colwise() - center);
+    paddedVerts = vertices -= padding * diff;
 
-        // Our formula to produce a constraint only gives us where it is 0; to
-        // determine which side is negative, we need to test one of them.  We
-        // choose to test constraint N + 1 (the one associated with vertices
-        // from 0 to N), since that will ideally correspond to an axis-aligned
-        // side of the simplex and therefore minimize the effect of numeric
-        // error.
-        auto negateAtN = false;
-        for (int i = N; i >= 0; --i) {
-            auto shiftedVert = [&](int idx)
-            {return vertices.col((i + idx) % (N + 1)); };
-            auto diff1 = shiftedVert(2) - shiftedVert(1);
-            Vector perp;
-            if constexpr (N == 2) {
-                perp << diff1.y(), -diff1.x();
+    // Our formula to produce a constraint only gives us where it is 0; to
+    // determine which side is negative, we need to test one of them.  We
+    // choose to test constraint N + 1 (the one associated with vertices
+    // from 0 to N), since that will ideally correspond to an axis-aligned
+    // side of the simplex and therefore minimize the effect of numeric
+    // error.
+    auto negateAtN = false;
+    for (int i = N; i >= 0; --i) {
+        auto shiftedVert = [&](int idx)
+        {return paddedVerts.col((i + idx) % (N + 1)); };
+        static_assert(N <= 3);
+        Vector perp;
+        double val;
+        if constexpr (N >= 1) {
+            if constexpr (N >= 2) {
+                auto diff1 = shiftedVert(2) - shiftedVert(1);
+                if constexpr (N == 3) {
+                    auto diff2 = shiftedVert(3) - shiftedVert(1);
+                    perp = diff1.cross(diff2);
+                }
+                else {
+                    perp << diff1.y(), -diff1.x();
+                }
             }
             else {
-                auto diff2 = shiftedVert(3) - shiftedVert(1);
-                perp = diff1.cross(diff2);
+                perp << 1.;
             }
-            auto val = perp.dot(shiftedVert(1));
-//            assert(val != perp.dot(vertices.col(i))); // If it is, our simplex
-                                                      // is degenerate.
-            if (i == N && val < perp.dot(vertices.col(N))) {
-                // perp causes vertices[N] to be higher than our constant
+            val = perp.dot(shiftedVert(1));
+            // Check that our simplex is not degenerate.
+            //            assert(val != perp.dot(paddedVerts.col(i)));
+            if (i == N && val < perp.dot(paddedVerts.col(N))) {
+                // perp causes paddedVerts[N] to be higher than our constant
                 // offset, so after the offset it'll still be positive, so
                 // we need to negate.
                 negateAtN = true;
             }
-            // If N is even, rotating the vertices will not change the sign
-            // of the determinant that we're effectively comparing to 0 here, 
-            // so we negate either everywhere or nowhere.  If N is odd, rotating
-            // the vertices by an even amount will not change the sign of the 
-            // determinant, but by an odd amount will flip it, so we alternate
-            // which ones we flip.
-            auto sameAsN = (N % 2 == 0 || i % 2 == 1);
-            if (sameAsN == negateAtN) {
-                constraints[i].matrix << -perp, val;
-            }
-            else {
-                constraints[i].matrix << perp, -val;
-            }
         }
-    }
-    else {
-        // QEFs with N of 0 or 1 should be occurring only as part of a higher-
-        // dimensional QEF, and thus should not be using this constructor at 
-        // all.
-        assert(false);
+        else {
+            // In 0d, we have one constraint corresponding to the side of the
+            // simplex not adjacent to our point, but we never use it for
+            // anything, and it has no real meaning since all constraints are
+            // only up to a constant positive factor.  So just set it to -1.
+            val = -1.;
+        }
+
+        // If N is even, rotating the vertices will not change the sign
+        // of the determinant that we're effectively comparing to 0 here, 
+        // so we negate either everywhere or nowhere.  If N is odd, rotating
+        // the vertices by an even amount will not change the sign of the 
+        // determinant, but by an odd amount will flip it, so we alternate
+        // which ones we flip.
+        auto sameAsN = (N % 2 == 0 || i % 2 == 1);
+        if (sameAsN == negateAtN) {
+            constraints[i].matrix << -perp, val;
+        }
+        else {
+            constraints[i].matrix << perp, -val;
+        }
     }
 }
 
@@ -103,8 +114,6 @@ const SimplexQEF<N - bitcount(mask)>& SimplexQEF<N>::sub() const
     else if constexpr (bitcount(mask) == 1) {
         auto& out = subs[highBit];
         if (!out.has_value()) {
-            out.emplace();
-            auto& outVal = out.value();
             const auto& constraint = constraints[highBit];
             auto axis = constraint.strongestDimension();
             assert(axis < N);
@@ -115,6 +124,20 @@ const SimplexQEF<N - bitcount(mask)>& SimplexQEF<N>::sub() const
             auto normalized = matrix / matrix[axis];
             Eigen::Matrix<double, N, 1> reduced;
             reduced << normalized.head(axis), normalized.tail(N - axis);
+            // Generate our restricted set of simplex vertices; we regenerate
+            // our lower-dimensional constraints from those rather than by
+            // intersecting higher-dimensional constraints in order to avoid
+            // floating-point issues when the simplex is nearly degenerate.
+            Eigen::Matrix<double, N - 1, N> newVerts;
+            if constexpr (N > 1) {
+                newVerts <<
+                    paddedVerts.topLeftCorner(axis, highBit),
+                    paddedVerts.topRightCorner(axis, N - highBit),
+                    paddedVerts.bottomLeftCorner(N - 1 - axis, highBit),
+                    paddedVerts.bottomRightCorner(N - 1 - axis, N - highBit);
+            }
+            out.emplace(std::move(newVerts), 0);
+            auto& outVal = out.value();
             if constexpr (N > 1) {
                 auto reducedHead = reduced.template head<N - 1>();
 
@@ -156,17 +179,6 @@ const SimplexQEF<N - bitcount(mask)>& SimplexQEF<N>::sub() const
             outVal.BtB = BtB; 
             outVal.BtB += AtA(axis, axis) * reduced[N - 1] * reduced[N - 1];
             outVal.BtB += 2 * AtB[axis] * reduced[N - 1];
-
-            for (auto idx = 0, newIdx = 0; idx < constraints.size(); ++idx) {
-                if (idx == highBit) {
-                    continue;
-                }
-                auto& matrix = outVal.constraints[newIdx].matrix;
-                const auto& oldMatrix = constraints[idx].matrix;
-                matrix << oldMatrix.head(axis), oldMatrix.tail(N - axis);
-                matrix -= oldMatrix[axis] * reduced;
-                ++newIdx;
-            }
 
             outVal.mass_point << 
                 mass_point.head(axis), mass_point.tail(N - axis);
@@ -250,6 +262,10 @@ typename SimplexQEF<N>::PointOpt SimplexQEF<N>::solveFromMask(
             }
         }
         if (!failedConstraint) {
+            if (std::abs(result.squaredNorm() - 25e-6) > 5e-6) {
+                result = convertFromSub<current_mask>(rawResult);
+                throw result;
+            }
             return result;
         }
     }

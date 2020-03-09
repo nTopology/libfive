@@ -59,6 +59,8 @@ struct SimplexLeafSubspace {
      *  the pool while they're still in use.  */
     std::atomic<uint32_t> refcount;
 
+    mutable std::array<std::atomic_int, 9> cornerCellSources{ 0 };
+
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 

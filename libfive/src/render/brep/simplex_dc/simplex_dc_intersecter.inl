@@ -13,6 +13,7 @@ You can obtain one at http://mozilla.org/MPL/2.0/.
 #include "libfive/render/brep/simplex/simplex_tree.hpp"
 #include "libfive/render/brep/object_pool.hpp"
 #include "libfive/render/brep/indexes.hpp"
+#include <set>
 
 namespace libfive {
 
@@ -279,6 +280,22 @@ void SimplexDCIntersecter<N>::load(const std::array<Input*, 1 << N>& ts)
 
     const auto& cornerSub = *ts[index]->leaf->sub[cornerSubspaceIndex].load();
 
+    auto incrementCorner = [&ts, &cornerSub](int target, int count = 1) {
+        std::set<SimplexLeafSubspace<N>*> handled;
+        for (auto i = 0; i < ts.size(); ++i) {
+            if (ts[i]->type == Interval::UNKNOWN) {
+                continue;
+            }
+            auto subIdx = CornerIndex((1 << N) - 1 - i).neighbor().i;
+            auto sub = ts[i]->leaf->sub[subIdx].load();
+            if (sub->vert == cornerSub.vert && handled.insert(sub).second) {
+                sub->cornerCellSources[target] += count;
+            }
+        }
+    };
+
+    incrementCorner(8);
+
     constexpr auto tsIndices = [](){
         static_assert(N == 2 || N == 3);
         if constexpr (N == 2) {
@@ -298,6 +315,7 @@ void SimplexDCIntersecter<N>::load(const std::array<Input*, 1 << N>& ts)
             auto lowerLevel = [&](int indexA, int indexB) {
                 if (bool(indexA & edgeAxis) != bool(edgePosition)) {
                     // That index cell does not border the edge we're 
+                    // looking at.
                     // looking at.
                     return false;
                 }
@@ -368,6 +386,7 @@ void SimplexDCIntersecter<N>::load(const std::array<Input*, 1 << N>& ts)
             }
         }
     }
+    incrementCorner(8);
 
     if constexpr (N == 3) {
         // Handle edges between face vertices and our corner vertex.
@@ -441,18 +460,22 @@ void SimplexDCIntersecter<N>::load(const std::array<Input*, 1 << N>& ts)
             }
         }
     }
+    incrementCorner(8);
 
     // Now handle edges between cell vertices and our corner vertex.
     std::array<SimplexDCIntersection<N>*, 1 << N> intersectForDup;
     intersectForDup.fill(nullptr);
     for (auto cell = 0; cell < ts.size(); ++cell) {
+        incrementCorner(cell);
         if (ts[cell]->type == Interval::UNKNOWN) {
             continue;
         }
+        incrementCorner(cell);
         const auto& cellSub = *ts[cell]->leaf->sub[ipow(3, N) - 1].load();
         if (cornerSub.inside == cellSub.inside) {
             continue;
         }
+        incrementCorner(cell);
         auto& inside = cornerSub.inside ? cornerSub.vert : cellSub.vert;
         auto& outside = cornerSub.inside ? cellSub.vert : cornerSub.vert;
         auto intersection = [&]() {
@@ -472,11 +495,13 @@ void SimplexDCIntersecter<N>::load(const std::array<Input*, 1 << N>& ts)
             auto edgeAxis = Axis::toAxis(edgeAxisIdx);
             auto edgePosition = bool(cell & edgeAxis);
             auto edge = edges[edgeAxisIdx * 2 + edgePosition];
+            incrementCorner(cell, ipow(10, 1 + edgeAxisIdx * 2 + edgePosition));
             if (edge == nullptr) {
                 // All simplices from this iteration would use a 
                 // nonexistent edge.
                 continue;
             }
+            incrementCorner(cell, ipow(10, 1 + edgeAxisIdx * 2 + edgePosition));
             for (auto faceAxisIdx = 0; faceAxisIdx < N - 1; ++faceAxisIdx) {
                 auto faceAxis = (faceAxisIdx == 0) ? Axis::Q(edgeAxis) : 
                                                      Axis::R(edgeAxis);
@@ -487,6 +512,7 @@ void SimplexDCIntersecter<N>::load(const std::array<Input*, 1 << N>& ts)
                     // The simplex would use a nonexistent face.
                     continue;
                 }
+                incrementCorner(cell, (1 + faceAxisIdx) * ipow(10, 1 + edgeAxisIdx * 2 + edgePosition));
                 auto& simplex = edge->simplex(edgeAxis, faceAxis, 
                                               cell, !edgePosition);
                 simplex.insertIntersection(0, N, intersection);

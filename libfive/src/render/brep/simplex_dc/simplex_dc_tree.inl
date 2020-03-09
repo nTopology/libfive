@@ -67,9 +67,11 @@ DCSimplex<N>::insertIntersection(unsigned a,
     auto& target = intersections[b * (b - 1) / 2 + a];
     SimplexDCIntersection<N>* ptr(nullptr);
     if (target.compare_exchange_strong(ptr, intersection)) {
+        ++intersection->refcount;
         return { intersection, true };
     }
     else {
+//        abort();
         return { ptr, false };
     }
 }
