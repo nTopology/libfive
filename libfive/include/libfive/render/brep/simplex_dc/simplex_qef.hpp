@@ -80,7 +80,8 @@ public:
      *  degenerate (equivalently, the matrix should have full rank); if this is
      *  not fulfilled, results of solve() are undefined.
      */
-    SimplexQEF(Eigen::Matrix<double, N, N + 1>&& vertices);
+    SimplexQEF(Eigen::Matrix<double, N, N + 1>&& vertices, 
+               double padding = constraintPadding);
 
     /*
      *  Accumulate QEFs by summing
@@ -93,13 +94,6 @@ public:
      */
     Point solve() const;
 
-    /*
-     *  The default constructor is used for sub-QEFs, which will be initialized
-     *  before being used.  Public to allow usage by std::optional::emplace, but
-     *  should not be used from a source truly outside this class.
-     */
-    SimplexQEF() {}
-
 protected:
 
     /*
@@ -108,8 +102,11 @@ protected:
     template <unsigned current_mask> 
     PointOpt solveFromMask(
         unsigned currentMasks, 
-        unsigned& nextMasksAnyValid, 
-        unsigned& nextMasksAllValid) const;
+        unsigned& nextMasksAnyFailed, 
+        unsigned& nextMasksAllFailed) const;
+
+    /*  Gets which constraints are failed by a given point.*/
+    unsigned constraintFailures(const Point& pt) const;
 
     /*
      *  Returns a new QEF corresponding to the subspace defined by the 
@@ -157,6 +154,11 @@ protected:
     // when one is needed.  (Will be more significant if eigenvalue pruning is
     // restored.)
     Eigen::Matrix<double, N + 1, 1> mass_point;
+
+    // The vertices of the simplex, pulled inward by padding.  While in 
+    // principle these are implied by the constraints, storing them explicitly
+    // can help avoid numeric error in some cases.
+    Eigen::Matrix<double, N, N + 1> paddedVerts;
 
     int8_t highest_rank = -1;
 

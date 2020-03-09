@@ -77,10 +77,12 @@ protected:
     /*
      *  Adds branes composing a polygon.  "simplices" should be in the 
      *  appropriate order, and the value type of container should be 
-     *  const DCSimplex<3>*.
+     *  const DCSimplex<3>*.  "dim0" and "dim1" are the dimensions of the
+     *  vertices that generated the edge we're building this polygon around.
      */
+
     template <class Container>
-    void addPolygon(const Container& simplices);
+    void addPolygon(const Container& simplices, int dim0, int dim1);
 
     PerThreadOutput& m;
 };

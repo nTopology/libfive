@@ -35,6 +35,51 @@ constexpr int _simplexEdges(unsigned N)
   return (N * (N + 1) / 2);
 }
 
+
+template <unsigned N>
+struct OrientationChecker; // A helper class to allow the SimplexDCIntersection
+                           // to check if two points are oriented as expected.
+
+template <>
+struct OrientationChecker<2>
+{
+    Eigen::Matrix2d endpoints;
+    void reset() { endpoints.setZero(); }
+    void setEndpts(const Eigen::Vector2d& a, const Eigen::Vector2d& b)
+        { endpoints << a, b; }
+
+    // Checks if the line between a and b goes between the two endpoints 
+    // (assuming they are on opposite sides of the infinite line generated 
+    // by those endpoints; otherwise, result is undefined).   Returns 0 if it 
+    // does, 1 if it is past endpt1, and 2 if it is past the other endpoint.  
+    // The order in which the endpoints were set is not relevent here, and 
+    // neither is the order of a and b.  If the line between a and b hits an 
+    // endpoint, it is considered to go past it.
+    int check(const Eigen::Vector2d& a, const Eigen::Vector2d& b,
+        const Eigen::Vector2d& endpt1) const;
+};
+
+template <>
+struct OrientationChecker<3>
+{
+    Eigen::Vector3d direction; // Outward direction.
+    void reset() { direction.setZero(); }
+    void setEndpts(
+        const Eigen::Vector3d& outside, const Eigen::Vector3d& inside)
+    { direction = outside - inside; }
+
+    // Checks whether the points passed are indeed clockwise and 
+    // counterclockwise when looking from the outside point toward the
+    // inside one.  Returns true if they are, false if they aren't (false
+    // if all four points are coplanar).  Assumes that "center" is on the
+    // line between the inside and outside points, in order to avoid having
+    // to explicitly store the two points (as center can be taken from the
+    // SimplexDCIntersection that holds this).
+    bool check(const Eigen::Vector3d& clockwisePt, 
+               const Eigen::Vector3d& counterclockwisePt,
+               const Eigen::Vector3d& center) const;
+};
+
 template <unsigned N>
 struct SimplexDCIntersection : Intersection<N>
 {
@@ -47,6 +92,11 @@ struct SimplexDCIntersection : Intersection<N>
     void reset();
 
     std::atomic<uint32_t> refcount = 0;
+
+    /*  Global indices for edge intersection vertices */
+    std::atomic<uint64_t> index = 0;
+
+    OrientationChecker<N> orientationChecker;
 };
 
 template <unsigned N>
@@ -66,6 +116,12 @@ struct DCSimplex
      * ref counting for the inserted intersection and thread-safety.*/
     std::pair<const SimplexDCIntersection<N>*, bool> insertIntersection(
         unsigned a, unsigned b, SimplexDCIntersection<N>* intersection);
+
+    /* Number of non-null intersections, for assertions/debugging.*/
+    int intersectionCount() const {
+        return std::count_if(intersections.begin(), intersections.end(),
+            [](const auto& atomic_ptr) {return atomic_ptr.load() != nullptr; });
+    }
 
     /*  Simplex vertex position */
     Eigen::Matrix<double, N, 1> vert;
@@ -309,6 +365,5 @@ inline constexpr DCSimplex<N>& SimplexDCMinEdge<N>::simplexWithFaceReducedCell(
     auto cell = (~fullCorner) & lowestBits(N);
     return simplex(edgeAxis, faceAxis, cell, bool(fullCorner & edgeAxis));
 }
-
 
 }   // namespace libfive

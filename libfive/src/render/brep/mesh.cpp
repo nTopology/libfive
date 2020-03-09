@@ -127,70 +127,74 @@ std::unique_ptr<Mesh> Mesh::render(
         if (settings.progress_handler) {
             // Pool::build, Edges, Intersecter, Vertexer, Mesher, t.reset
             settings.progress_handler->start({ 1, 1, 1, 1, 1, 1 });
-            auto t = SimplexDCWorkerPool<3>::build(es, r, settings);
-            if (settings.cancel.load() || t.get() == nullptr) {
-                if (settings.progress_handler) {
-                    settings.progress_handler->finish();
-                }
-                return nullptr;
-            }
-
-            // Edges
-            Dual<3>::walk<SimplexDCEdges<3>, decltype(t.pool())> (
-                t, settings, t.pool());
-
-            if (settings.cancel.load()) {
-                if (settings.progress_handler) {
-                    settings.progress_handler->finish();
-                }
-                t.reset(settings);
-                return nullptr;
-            }
-
-            // To do when it's time for it: Degeneracy handling (collapse or center)
-
-            // Get the intersections
-            Dual<3>::walk_<SimplexDCIntersecter<3>>(
-                t, settings, 
-                [&](SimplexDCIntersecter<3>::PerThreadOutput& brep, int i) {
-                return SimplexDCIntersecter<3>(
-                    brep, &es[i], t.pool(), {});
-            });
-
-            if (settings.cancel.load()) {
-                if (settings.progress_handler) {
-                    settings.progress_handler->finish();
-                }
-                t.reset(settings);
-                return nullptr;
-            }
-
-            // Get the vertices
-            auto vertsBRep = Dual<3>::walk<SimplexDCVertexer<3>>(t, settings);
-
-            if (settings.cancel.load()) {
-                if (settings.progress_handler) {
-                    settings.progress_handler->finish();
-                }
-                t.reset(settings);
-                return nullptr;
-            }
-
-            // Connect the vertices
-            out = Dual<3>::walk<SimplexDCMesher>(t, settings);
-
-            if (settings.cancel.load()) {
-                if (settings.progress_handler) {
-                    settings.progress_handler->finish();
-                }
-                t.reset(settings);
-                return nullptr;
-            }
-
-            t.reset(settings);
-
-            out->verts = std::move(vertsBRep->verts);
         }
+        auto t = SimplexDCWorkerPool<3>::build(es, r, settings);
+        if (settings.cancel.load() || t.get() == nullptr) {
+            if (settings.progress_handler) {
+                settings.progress_handler->finish();
+            }
+            return nullptr;
+        }
+
+        // Edges
+        Dual<3>::walk<SimplexDCEdges<3>, decltype(t.pool())> (
+            t, settings, t.pool());
+
+        if (settings.cancel.load()) {
+            if (settings.progress_handler) {
+                settings.progress_handler->finish();
+            }
+            t.reset(settings);
+            return nullptr;
+        }
+
+        // To do when it's time for it: Degeneracy handling (collapse or center)
+
+        // Get the intersections
+        auto intersectionsBRep = Dual<3>::walk_<SimplexDCIntersecter<3>>(
+            t, settings, 
+            [&](SimplexDCIntersecter<3>::PerThreadOutput& brep, int i) {
+            return SimplexDCIntersecter<3>(
+                brep, &es[i], t.pool(), {});
+        });
+
+        if (settings.cancel.load()) {
+            if (settings.progress_handler) {
+                settings.progress_handler->finish();
+            }
+            t.reset(settings);
+            return nullptr;
+        }
+
+        // Get the vertices
+        auto vertsBRep = Dual<3>::walk<SimplexDCVertexer<3>>(
+            t, settings, intersectionsBRep->verts.size() - 1/*Vert offset*/);
+
+        if (settings.cancel.load()) {
+            if (settings.progress_handler) {
+                settings.progress_handler->finish();
+            }
+            t.reset(settings);
+            return nullptr;
+        }
+
+        // Connect the vertices
+        out = Dual<3>::walk<SimplexDCMesher>(t, settings);
+
+        if (settings.cancel.load()) {
+            if (settings.progress_handler) {
+                settings.progress_handler->finish();
+            }
+            t.reset(settings);
+            return nullptr;
+        }
+
+        t.reset(settings);
+
+        out->verts = std::move(intersectionsBRep->verts);
+        assert(!vertsBRep->verts.empty());
+        out->verts.insert(out->verts.end(), 
+            vertsBRep->verts.begin() + 1, vertsBRep->verts.end());
     }
 
     if (settings.progress_handler) {

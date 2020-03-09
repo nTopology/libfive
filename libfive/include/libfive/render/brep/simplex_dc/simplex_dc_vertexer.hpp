@@ -35,7 +35,8 @@ public:
     /*
      *  Constructor.
      */
-    SimplexDCVertexer(PerThreadBRep<N>& m) : m(m) {}
+    SimplexDCVertexer(PerThreadBRep<N>& m, size_t vertsOffset) 
+        : m(m), offset(vertsOffset) {}
 
     /* 
      *  Empty cell loader, called by Dual::walk 
@@ -81,6 +82,9 @@ protected:
         DCSimplex<N>& simplex, SubspaceVertArray vertsFromSubspaces);
 
     PerThreadBRep<N>& m;
+
+    size_t offset; // Offset when storing vertices, since early vertex numbers
+                   // are taken by intersection vertices.
 };
 
 ////////////////////////////////////////////////////////////////////////////////
