@@ -25,27 +25,22 @@ template <unsigned N> struct SimplexLeaf;
 template <unsigned N> struct SimplexDCMinEdge;
 template <unsigned N> struct SimplexDCIntersection;
 template <typename... T> class ObjectPool;
+template <unsigned N> class PerThreadBRep;
+template <unsigned N> class BRep;
 class Evaluator;
 
 /*  This dual-walker class finds the intersections between the surface and
  *  each edge of the simplices in the input tree, storing them in the
- *  appropriate simplices.*/
+ *  appropriate simplices.  The returned output contains vertices only (no
+ *  branes), and only those for the intersections (which serve to assist
+ *  triangulation of the polygons that will eventually be built around them).*/
 
 template <unsigned N>
 class SimplexDCIntersecter
 {
 public:
-    struct PerThreadOutput {
-        /*  Constructor needed for dual-walking, but we don't actually
-         *  use the atomic int, since we're storing edge-specific
-         *  information directly in the input tree.*/
-        PerThreadOutput(std::atomic<uint32_t>& c) {}
-    };
-    struct Output {
-        /*  Another method needed only to fulfill the dual-walking algorithm's
-         *  requirements*/
-        void collect(std::vector<PerThreadOutput>) {}
-    };
+    using PerThreadOutput = PerThreadBRep<N>;
+    using Output = BRep<N>;
     using Input = SimplexTree<N, SimplexDCLeaf<N>>;
 
     using Perp = Eigen::Array<double, 3 - N, 1>;
@@ -112,6 +107,8 @@ protected:
     Evaluator* eval;
     bool owned;
     Perp perp;
+
+    PerThreadBRep<N>& m;
 };
 
 ////////////////////////////////////////////////////////////////////////////////

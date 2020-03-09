@@ -56,7 +56,7 @@ void SimplexDCVertexer<N>::load(const std::array<Input*, 1 << (N - 1)> & ts)
 
     if constexpr (N == 3) {
         for (auto i = 0; i < 4; ++i) {
-            auto cellIdxA = i & 1 ? 3 : 0;
+            auto cellIdxA = (i & 1) ? 3 : 0;
             auto cellIdxB = cellIdxA ^ (i & 2 ? 2 : 1);
             if (ts[cellIdxA] == ts[cellIdxB]) {
                 // The face is interior to a merged cell and hence
@@ -71,7 +71,7 @@ void SimplexDCVertexer<N>::load(const std::array<Input*, 1 << (N - 1)> & ts)
                 continue;
             }
             auto faceAxis = (i & 2) ? R(A) : Q(A);
-            bool isUpperToFace(bestCellIdx & faceAxis);
+            bool isUpperToFace(bestCellIdx & (i & 2 ? 2 : 1));
             auto faceSubspaceIndex = 
                 26 - ipow(3, Axis::toIndex(faceAxis)) * (isUpperToFace + 1);
             faceSubs[i] = ts[bestCellIdx]->leaf->sub[faceSubspaceIndex].load();
@@ -98,6 +98,9 @@ void SimplexDCVertexer<N>::load(const std::array<Input*, 1 << (N - 1)> & ts)
             for (auto corner = 0; corner < 2; ++corner) {
                 auto& simplex = edge.simplexWithEdgeReducedCell(
                     A, faceAxis, cellIdx, corner);
+                assert(simplex.intersectionCount() == 3 ||
+                    simplex.intersectionCount() == 4 ||
+                    simplex.intersectionCount() == 0);
                 auto getVerts = [&]()->SubspaceVertArray {
                     if constexpr (N == 3) {
                         return { cornerSubs[corner], edgeSub, 
@@ -118,8 +121,21 @@ void SimplexDCVertexer<N>::calcAndStoreVert(
     DCSimplex<N>& simplex, SubspaceVertArray vertsFromSubspaces)
 {
     Eigen::Matrix<double, N, N + 1> vertices;
+    auto state = 0; // Bit 1 for inside, bit 2 for empty.
     for (auto i = 0; i <= N; ++i) {
+        if (vertsFromSubspaces[i]->inside) {
+            state |= 1;
+        }
+        else {
+            state |= 2;
+        }
         vertices.col(i) = vertsFromSubspaces[i]->vert;
+    }
+    if (state != 3) {
+        assert(state == 1 || state == 2);
+        assert(simplex.intersectionCount() == 0);
+        return; // No point in making a vertex if the simplex is all
+                // filled or all empty.
     }
 
     SimplexQEF<N> qef(std::move(vertices));
@@ -133,7 +149,8 @@ void SimplexDCVertexer<N>::calcAndStoreVert(
         }
     }
     simplex.vert = qef.solve();
-    simplex.index = m.pushVertex(simplex.vert);
+    assert(simplex.index == 0);
+    simplex.index = m.pushVertex(simplex.vert) + offset;
 }
 
 

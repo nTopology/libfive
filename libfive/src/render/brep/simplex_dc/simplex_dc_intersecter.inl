@@ -13,6 +13,8 @@ You can obtain one at http://mozilla.org/MPL/2.0/.
 #include "libfive/render/brep/simplex/simplex_tree.hpp"
 #include "libfive/render/brep/object_pool.hpp"
 #include "libfive/render/brep/indexes.hpp"
+#include "libfive/render/brep/per_thread_brep.hpp"
+#include <set>
 
 namespace libfive {
 
@@ -20,7 +22,7 @@ template <unsigned N>
 SimplexDCIntersecter<N>::SimplexDCIntersecter(
     PerThreadOutput& m, Tree t, 
     ObjectPool<SimplexDCIntersection<N>>& pool, Perp perp)
-    : parent_pool(pool), eval(new Evaluator(t)), owned(true), perp(perp)
+    : parent_pool(pool), eval(new Evaluator(t)), owned(true), perp(perp), m(m)
 {
     // Nothing to do here
 }
@@ -29,7 +31,7 @@ template <unsigned N>
 SimplexDCIntersecter<N>::SimplexDCIntersecter(
     PerThreadOutput& m, Evaluator* es, 
     ObjectPool<SimplexDCIntersection<N>>& pool, Perp perp)
-    : parent_pool(pool), eval(es), owned(false), perp(perp)
+    : parent_pool(pool), eval(es), owned(false), perp(perp), m(m)
 {
     // Nothing to do here
 }
@@ -88,12 +90,22 @@ void SimplexDCIntersecter<N>::load(const std::array<Input*, 1 << (N - 2)>& ts)
                     auto& edge = ts[index]->leaf->edgeFromFaceAndIndex(
                         edgeAxis, A, edgePos == 1, index == 0);
                     for (auto cornerIdx = 0; cornerIdx < 2; ++cornerIdx) {
-                        auto corner = axisIdx == 0 ? edgePos + 2 * cornerIdx :
-                                                     2 * edgePos + cornerIdx;
+                        // cornerIdx is the position with respect to edgeAxis,
+                        // and edgePos is that with respect to the third axis
+                        // (neither edge nor face), so how we combine the two
+                        // into a single face-reduced corner depends on whether
+                        // the edge axis is Q or R of the face axis (as bit 1
+                        // of the combined corner represents Q of the face axis,
+                        // and bit 2 represents R.)
+                        auto corner = axisIdx == 0 ? 2 * edgePos + cornerIdx :
+                                                     edgePos + 2 * cornerIdx;
                         auto writeToSimplex = [&](SimplexDCMinEdge<N>* edge) {
                             auto& simplex = edge->simplexWithFaceReducedCell(
-                            edgeAxis, A, edgePos == 1, corner);
-                            simplex.insertIntersection(2, 3, intersection);
+                            edgeAxis, A, cell == 1, corner);
+                            [[maybe_unused]] auto [res, success] =
+                                simplex.insertIntersection(2, 3, intersection);
+                            assert(success);
+                            assert(res == intersection);
                         };
                         if (std::holds_alternative<SimplexDCMinEdge<N>*>(edge)) {
                             writeToSimplex(std::get<SimplexDCMinEdge<N>*>(edge));
@@ -194,7 +206,10 @@ void SimplexDCIntersecter<N>::load(const std::array<Input*, 1 << (N - 1)>& ts)
                             std::get<SimplexDCMinEdge<N>*>(edge)
                             ->simplexWithEdgeReducedCell(
                             A, faceAxis, cellFrom4, corner);
-                        simplex.insertIntersection(1, 2, intersection);
+                        [[maybe_unused]] auto [res, success] =
+                            simplex.insertIntersection(1, 2, intersection);
+                        assert(success);
+                        assert(res == intersection);
                     }
                 }
             }
@@ -231,6 +246,7 @@ void SimplexDCIntersecter<N>::load(const std::array<Input*, 1 << (N - 1)>& ts)
             }
             return out;
         }();
+        assert(intersection != nullptr);
         for (auto faceAxisIdx = 0; faceAxisIdx < 2; ++faceAxisIdx) {
             auto faceAxis = (faceAxisIdx == 0) ? Axis::Q(A) : Axis::R(A);
             if constexpr (N == 2) {
@@ -252,8 +268,11 @@ void SimplexDCIntersecter<N>::load(const std::array<Input*, 1 << (N - 1)>& ts)
                 // using the minimal cell adjoining the edge in 
                 // question (which is the edge we're loading).
                 auto& simplex = std::get<SimplexDCMinEdge<N>*>(edge)
-                                    ->simplex(A, faceAxis, cell, corner);
-                simplex.insertIntersection(1, N, intersection);
+                    ->simplexWithEdgeReducedCell(A, faceAxis, cell, corner);
+                [[maybe_unused]] auto [res, success] =
+                    simplex.insertIntersection(1, N, intersection);
+                assert(success);
+                assert(res == intersection);
             }
         }
     }
@@ -298,6 +317,7 @@ void SimplexDCIntersecter<N>::load(const std::array<Input*, 1 << N>& ts)
             auto lowerLevel = [&](int indexA, int indexB) {
                 if (bool(indexA & edgeAxis) != bool(edgePosition)) {
                     // That index cell does not border the edge we're 
+                    // looking at.
                     // looking at.
                     return false;
                 }
@@ -363,7 +383,10 @@ void SimplexDCIntersecter<N>::load(const std::array<Input*, 1 << N>& ts)
                     }
                     auto& simplex = edge->simplexWithEdgeReducedCell(
                         edgeAxis, faceAxis, cell, !bool(edgePosition));
-                    simplex.insertIntersection(0, 1, intersection);
+                    [[maybe_unused]] auto [res, success] =
+                        simplex.insertIntersection(0, 1, intersection);
+                    assert(success);
+                    assert(res == intersection);
                 }
             }
         }
@@ -435,7 +458,10 @@ void SimplexDCIntersecter<N>::load(const std::array<Input*, 1 << N>& ts)
                     for (auto cell = 0; cell < 2; ++cell) {
                         auto& simplex = edge->simplexWithFaceReducedCell(
                             edgeAxis, faceAxis, cell, 3 - facePosition);
-                        simplex.insertIntersection(0, 2, intersection);
+                        [[maybe_unused]] auto [res, success] =
+                            simplex.insertIntersection(0, 2, intersection);
+                        assert(success);
+                        assert(res == intersection);
                     }
                 }
             }
@@ -457,8 +483,9 @@ void SimplexDCIntersecter<N>::load(const std::array<Input*, 1 << N>& ts)
         auto& outside = cornerSub.inside ? cellSub.vert : cornerSub.vert;
         auto intersection = [&]() {
             for (auto i = 0; i < N; ++i) {
-                auto axis = Axis::Axis(i);
-                if (ts[cell] == ts[cell ^ axis]) {
+                auto axis = Axis::toAxis(i);
+                if (ts[cell] == ts[cell ^ axis] && 
+                    intersectForDup[cell ^ axis] != nullptr) {
                     intersectForDup[cell] = intersectForDup[cell ^ axis];
                     return intersectForDup[cell];
                 }
@@ -489,7 +516,10 @@ void SimplexDCIntersecter<N>::load(const std::array<Input*, 1 << N>& ts)
                 }
                 auto& simplex = edge->simplex(edgeAxis, faceAxis, 
                                               cell, !edgePosition);
-                simplex.insertIntersection(0, N, intersection);
+                [[maybe_unused]] auto [res, success] = 
+                    simplex.insertIntersection(0, N, intersection);
+                assert(success);
+                assert(res == intersection);
             }
         }
     }
@@ -615,6 +645,9 @@ SimplexDCIntersection<N>* SimplexDCIntersecter<N>::searchEdge(
             }
         }
     }
+    intersection->index = 
+        m.pushVertex(intersection->normalized_mass_point().head<N>().eval());
+    intersection->orientationChecker.setEndpts(outside, inside);
     return intersection;
 }
 
