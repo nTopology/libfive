@@ -717,8 +717,11 @@ void SimplexDCMesher::addPolygon(const Container& simplices, int dim0, int dim1)
             // can consider the simplex vertices as forming arcs around the
             // common edge; this can only happen if the arc between these two
             // vertices is greater than 180 degrees, and therefore should
-            // happen at most once.
-            assert(++skippedCount == 1);
+            // happen at most once, assuming no degenerate simplices.  However,
+            // we currently still have degenerate and near-degenerate simplices,
+            // and that can cause there to be more skipped triangles, so we
+            // disable this assert for now.
+            // assert(++skippedCount == 1);
             // We don't make any triangles in this case; the "missing" triangle
             // will be handled in a corresponding case 1, with the same two
             // simplices in the opposite order and the same two intersections
@@ -735,7 +738,7 @@ void SimplexDCMesher::addPolygon(const Container& simplices, int dim0, int dim1)
             // an arc of greater than 180 degrees, so we can increment
             // and check skippedCount.
             assert(intersection->index != otherSharedIntersection->index);
-            assert(++skippedCount == 1);
+            // assert(++skippedCount == 1);
             if (intersection->index < otherSharedIntersection->index) {
                 break;
             }
