@@ -60,6 +60,25 @@ set(five_sources
     render/brep/simplex/simplex_object_pool3.cpp
     render/brep/simplex/simplex_mesher.cpp
 
+    render/brep/simplex_dc/simplex_dc_edges2.cpp
+    render/brep/simplex_dc/simplex_dc_edges3.cpp
+    render/brep/simplex_dc/simplex_dc_intersecter2.cpp
+    render/brep/simplex_dc/simplex_dc_intersecter3.cpp
+    render/brep/simplex_dc/simplex_dc_mesher.cpp
+    render/brep/simplex_dc/simplex_dc_neighbors2.cpp
+    render/brep/simplex_dc/simplex_dc_neighbors3.cpp
+    render/brep/simplex_dc/simplex_dc_object_pool2.cpp
+    render/brep/simplex_dc/simplex_dc_object_pool3.cpp
+    render/brep/simplex_dc/simplex_dc_tree2.cpp
+    render/brep/simplex_dc/simplex_dc_tree3.cpp
+    render/brep/simplex_dc/simplex_dc_vertexer2.cpp
+    render/brep/simplex_dc/simplex_dc_vertexer3.cpp
+    render/brep/simplex_dc/simplex_dc_xtree2.cpp
+    render/brep/simplex_dc/simplex_dc_xtree3.cpp
+    render/brep/simplex_dc/simplex_dc_worker_pool2.cpp
+    render/brep/simplex_dc/simplex_dc_worker_pool3.cpp
+    render/brep/simplex_dc/simplex_qef.cpp
+
     render/brep/vol/vol_neighbors.cpp
     render/brep/vol/vol_object_pool.cpp
     render/brep/vol/vol_tree.cpp
@@ -90,6 +109,8 @@ else()
     target_compile_definitions(five PUBLIC
         FIVE_DLL)
 endif()
+
+target_compile_features(five PUBLIC cxx_std_17)
 
 if(LIBFIVE_UNNORMALIZED_DERIVS)
     target_compile_definitions(five PUBLIC

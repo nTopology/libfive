@@ -133,7 +133,7 @@ void SimplexDCMesher::load(const std::array<Input*, 4>& ts)
     for (auto faceAxisIdx = 0; faceAxisIdx < 2; ++faceAxisIdx) {
         auto faceAxis = (faceAxisIdx == 0) ? Axis::Q(A) : Axis::R(A);
         for (auto facePosition = 0; facePosition < 2; ++facePosition) {
-            auto indexA = facePosition == 0 ? 0 : 3;
+            auto indexA = facePosition == 0 ? 0 : (2 >> faceAxisIdx);
             auto indexB = indexA ^ (1 << faceAxisIdx);
             if (ts[indexA] == ts[indexB]) {
                 // Due to a merged cell, there is no face in that direction
