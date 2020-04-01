@@ -52,7 +52,7 @@ template<unsigned N>
 inline std::pair<const SimplexDCIntersection<N>*, bool> 
 DCSimplex<N>::insertIntersection(unsigned a, 
                                  unsigned b, 
-                                 SimplexDCIntersection<N>* intersection)
+                                 const SimplexDCIntersection<N>* intersection)
 {
     if (a == b) {
         assert(false);
@@ -66,7 +66,7 @@ DCSimplex<N>::insertIntersection(unsigned a,
         return { nullptr, false };
     }
     auto& target = intersections[b * (b - 1) / 2 + a];
-    SimplexDCIntersection<N>* ptr(nullptr);
+    const SimplexDCIntersection<N>* ptr(nullptr);
     if (target.compare_exchange_strong(ptr, intersection)) {
         ++intersection->refcount;
         return { intersection, true };
@@ -105,7 +105,8 @@ void SimplexDCMinEdge<N>::releaseTo(Pool& object_pool)
                 continue;
             }
             if (--intersection->refcount == 0) {
-                object_pool.next().put(intersection);
+                object_pool.next().put(
+                    const_cast<SimplexDCIntersection<N>*>(intersection));
             }
             i = nullptr;
         }
@@ -175,6 +176,28 @@ void SimplexDCLeaf<N>::releaseTo(Pool& object_pool)
         }
     }
     object_pool.put(this);
+}
+
+template<unsigned N>
+inline SimplexLeafSubspace<N>* SimplexDCLeaf<N>::collapsedSub(unsigned index)
+{
+    auto direct = sub[index].load();
+    auto ref = direct->collapseRef;
+    index = NeighborIndex(index).fromRelativeToThis(ref).i;
+    return sub[index].load();
+}
+
+template<unsigned N>
+inline void SimplexDCLeaf<N>::setSub(
+    size_t index, SimplexLeafSubspace<N>* newSub)
+{
+    auto oldSub = sub[index].load();
+    if (oldSub == newSub) {
+        return;
+    }
+    sub[index] = newSub;
+    ++newSub->refcount;
+    --oldSub->refcount;
 }
 
 }   // namespace libfive

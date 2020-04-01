@@ -59,6 +59,14 @@ struct SimplexLeafSubspace {
      *  the pool while they're still in use.  */
     std::atomic<uint32_t> refcount;
 
+    /*  In Simplex DC meshing, it is possible for one subspace vertex to be
+     *  collapsed into another one.  This tracks that collapsing; it uses
+     *  the same ternary method as subs, but includes only those axes that
+     *  are floating in this sub; in the case of a face in 3 dimensions, the
+     *  ordering of the axes for this purpose is Q(A), R(A), where A is the 
+     *  axis of the face.*/
+    unsigned collapseRef;
+
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
@@ -199,14 +207,14 @@ public:
     static SimplexTree<N, Leaf>* singletonFilled() { return nullptr; }
     static bool isSingleton(const SimplexTree<N, Leaf>*) { return false; }
 
-protected:
     /*
      *  Calculate and store whether each vertex is inside or outside
      *  This populates leaf->sub[i]->inside, for i in 0..ipow(3, N)
      */
     void saveVertexSigns(Evaluator* eval,
-                         const Tape::Handle& tape,
-                         const std::array<bool, ipow(3, N)>& already_solved);
+        const Tape::Handle& tape,
+        const std::array<bool, ipow(3, N)>& already_solved);
+protected:
 
     /*
      *  Sets this->type to EMPTY / FILLED / AMBIGUOUS depending on

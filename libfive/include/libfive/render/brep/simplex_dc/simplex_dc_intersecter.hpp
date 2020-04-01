@@ -15,13 +15,12 @@ You can obtain one at http://mozilla.org/MPL/2.0/.
 #include "libfive/render/axes.hpp"
 #include "libfive/eval/tape.hpp"
 #include "libfive/tree/tree.hpp"
-#include "libfive/render/brep/simplex_dc/simplex_dc_tree.hpp"
 
 namespace libfive {
 
 // Forward declarations
 template <unsigned N, class Leaf> class SimplexTree;
-template <unsigned N> struct SimplexLeaf;
+template <unsigned N> struct SimplexDCLeaf;
 template <unsigned N> struct SimplexDCMinEdge;
 template <unsigned N> struct SimplexDCIntersection;
 template <typename... T> class ObjectPool;

@@ -646,7 +646,7 @@ void SimplexDCMesher::addPolygon(const Container& simplices, int dim0, int dim1)
     // Get the intersection mass point for a neater, and easier to prevent 
     // self-intersection in, triangulation.
     auto intersection = simplices[0]->intersection(dim0, dim1);
-    assert(intersection != nullptr);
+    assert(DCSimplex<3>::isValid(intersection));
     assert(intersection->index != 0);
     for (auto& simplex : simplices) {
         assert(simplex->intersection(dim0, dim1) == intersection);
@@ -661,7 +661,9 @@ void SimplexDCMesher::addPolygon(const Container& simplices, int dim0, int dim1)
         return (*iter)->vert;
     };
     auto getIntersection = [](auto iter, int dim0, int dim1) {
-        return (*iter)->intersection(dim0, dim1);
+        auto out = (*iter)->intersection(dim0, dim1);
+        assert(DCSimplex<3>::isValid(out));
+        return out;
     };
     auto intersectionVert = 
         intersection->normalized_mass_point().template head<3>().eval();

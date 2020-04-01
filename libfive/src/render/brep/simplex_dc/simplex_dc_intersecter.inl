@@ -65,7 +65,7 @@ void SimplexDCIntersecter<N>::load(const std::array<Input*, 1 << (N - 2)>& ts)
         auto faceSubspaceIndex = 
             (ipow(3, N) - 1) - ipow(3, Axis::toIndex(A)) * (index + 1);
 
-        const auto& faceSub = *ts[index]->leaf->sub[faceSubspaceIndex].load();
+        auto faceSub = ts[index]->leaf->sub[faceSubspaceIndex].load();
 
         // Now that we have the intersections, we need to write them to every 
         // simplex that contains this face.  Again, we use the smallest of the 
@@ -76,14 +76,15 @@ void SimplexDCIntersecter<N>::load(const std::array<Input*, 1 << (N - 2)>& ts)
             if (ts[cell]->type != Interval::AMBIGUOUS) {
                 continue;
             }
-            const auto& cellSub = *ts[cell]->leaf->sub[ipow(3, N) - 1].load();
-            if (faceSub.inside == cellSub.inside) {
+            const auto& cellSub = ts[cell]->leaf->collapsedSub(ipow(3, N) - 1);
+            auto isSame = faceSub == cellSub;
+            if (!isSame && faceSub->inside == cellSub->inside) {
                 continue;
             }
-            auto& inside = faceSub.inside ? faceSub.vert : cellSub.vert;
-            auto& outside = faceSub.inside ? cellSub.vert : faceSub.vert;
-            auto intersection = searchEdge(inside, outside,
-                                           ts[cell]->leaf->tape);
+            auto& inside = faceSub->inside ? faceSub->vert : cellSub->vert;
+            auto& outside = faceSub->inside ? cellSub->vert : faceSub->vert;
+            auto intersection = isSame ? &DCSimplex<N>::dupVertIntersection
+                : searchEdge(inside, outside, ts[cell]->leaf->tape);
             for (auto axisIdx = 0; axisIdx < 2; ++axisIdx) {
                 auto edgeAxis = axisIdx == 0 ? Axis::Q(A) : Axis::R(A);
                 for (auto edgePos = 0; edgePos < 2; ++edgePos) {
@@ -158,7 +159,7 @@ void SimplexDCIntersecter<N>::load(const std::array<Input*, 1 << (N - 1)>& ts)
 
     auto edgeSubspaceIndex = (ipow(3, N) - 1) - totalReductions;
 
-    const auto& edgeSub = *ts[index]->leaf->sub[edgeSubspaceIndex].load();
+    auto edgeSub = ts[index]->leaf->collapsedSub(edgeSubspaceIndex);
 
     auto& edge = ts[index]->leaf->edgeFromReduced(A, ts.size() - 1 - index);
 
@@ -187,15 +188,15 @@ void SimplexDCIntersecter<N>::load(const std::array<Input*, 1 << (N - 1)>& ts)
                 auto indexFromFace = bool(faceIndex & (1 << faceAxisIdx));
                 auto faceSubIndex = (ipow(3, N) - 1) - 
                     ipow(3, Axis::toIndex(faceAxis)) * (indexFromFace + 1);
-                const auto& faceSub = 
-                    *ts[faceIndex]->leaf->sub[faceSubIndex].load();
-                if (edgeSub.inside == faceSub.inside) {
+                auto faceSub = ts[faceIndex]->leaf->collapsedSub(faceSubIndex);
+                auto isSame = edgeSub == faceSub;
+                if (edgeSub->inside == faceSub->inside) {
                     continue;
                 }
-                auto& inside = edgeSub.inside ? edgeSub.vert : faceSub.vert;
-                auto& outside = edgeSub.inside ? faceSub.vert : edgeSub.vert;
-                auto intersection = searchEdge(inside, outside,
-                    ts[faceIndex]->leaf->tape);
+                auto& inside = edgeSub->inside ? edgeSub->vert : faceSub->vert;
+                auto& outside = edgeSub->inside ? faceSub->vert : edgeSub->vert;
+                auto intersection = isSame ? &DCSimplex<N>::dupVertIntersection
+                    : searchEdge(inside, outside, ts[faceIndex]->leaf->tape);
                 for (auto cell = 0; cell < 2; ++cell) {
                     auto cellFrom4 = (faceAxisIdx ? facePosition + 2 * cell
                                                   : 2 * facePosition + cell);
@@ -218,14 +219,15 @@ void SimplexDCIntersecter<N>::load(const std::array<Input*, 1 << (N - 1)>& ts)
         }
     }
 
-    SimplexDCIntersection<N>* doubledCellIntersection = nullptr;
+    const SimplexDCIntersection<N>* doubledCellIntersection = nullptr;
     // Now handle edges between cell vertices and our edge vertex.
     for (auto cell = 0; cell < ts.size(); ++cell) {
         if (ts[cell]->type == Interval::UNKNOWN) {
             continue;
         }
-        const auto& cellSub = *ts[cell]->leaf->sub[ipow(3, N) - 1].load();
-        if (edgeSub.inside == cellSub.inside) {
+        auto cellSub = ts[cell]->leaf->collapsedSub(ipow(3, N) - 1);
+        auto isSame = edgeSub == cellSub;
+        if (!isSame && edgeSub->inside == cellSub->inside) {
             continue;
         }
         auto isDoubledOrOpposite = false;
@@ -236,13 +238,14 @@ void SimplexDCIntersecter<N>::load(const std::array<Input*, 1 << (N - 1)>& ts)
                 isDoubledOrOpposite = true;
             }
         }
-        auto& inside = edgeSub.inside ? edgeSub.vert : cellSub.vert;
-        auto& outside = edgeSub.inside ? cellSub.vert : edgeSub.vert;
+        auto& inside = edgeSub->inside ? edgeSub->vert : cellSub->vert;
+        auto& outside = edgeSub->inside ? cellSub->vert : edgeSub->vert;
         auto intersection = [&](){
             if (isDoubledOrOpposite && doubledCellIntersection != nullptr) {
                 return doubledCellIntersection;
             }
-            auto out = searchEdge(inside, outside, ts[cell]->leaf->tape);
+            auto out = isSame ? &DCSimplex<N>::dupVertIntersection :
+                searchEdge(inside, outside, ts[cell]->leaf->tape);
             if (isDoubledOrOpposite) {
                 doubledCellIntersection = out;
             }
@@ -298,7 +301,7 @@ void SimplexDCIntersecter<N>::load(const std::array<Input*, 1 << N>& ts)
 
     auto cornerSubspaceIndex = CornerIndex((1 << N) - 1 - index).neighbor().i;
 
-    const auto& cornerSub = *ts[index]->leaf->sub[cornerSubspaceIndex].load();
+    auto cornerSub = ts[index]->leaf->collapsedSub(cornerSubspaceIndex);
 
     constexpr auto tsIndices = [](){
         static_assert(N == 2 || N == 3);
@@ -359,15 +362,15 @@ void SimplexDCIntersecter<N>::load(const std::array<Input*, 1 << N>& ts)
             edges[edgeAxisIdx * 2 + edgePosition] = edge;
             auto edgeSubIndex = CornerIndex(lowerCorner).neighbor().i + 
                 2 * ipow(3, Axis::toIndex(edgeAxis));
-            const auto& edgeSub = 
-                *ts[edgeIndex]->leaf->sub[edgeSubIndex].load();
-            if (cornerSub.inside == edgeSub.inside) {
+            auto edgeSub = ts[edgeIndex]->leaf->collapsedSub(edgeSubIndex);
+            auto isSame = cornerSub == edgeSub;
+            if (!isSame && cornerSub->inside == edgeSub->inside) {
                 continue;
             }
-            auto& inside = cornerSub.inside ? cornerSub.vert : edgeSub.vert;
-            auto& outside = cornerSub.inside ? edgeSub.vert : cornerSub.vert;
-            auto intersection = searchEdge(inside, outside,
-                                           ts[edgeIndex]->leaf->tape);
+            auto& inside = cornerSub->inside ? cornerSub->vert : edgeSub->vert;
+            auto& outside = cornerSub->inside ? edgeSub->vert : cornerSub->vert;
+            auto intersection = isSame ? &DCSimplex<N>::dupVertIntersection : 
+                searchEdge(inside, outside, ts[edgeIndex]->leaf->tape);
             for (auto faceAxis : { Axis::Q(edgeAxis), Axis::R(edgeAxis) }) {
                 if (N == 2 && faceAxis == Axis::Z) {
                     continue;
@@ -398,7 +401,7 @@ void SimplexDCIntersecter<N>::load(const std::array<Input*, 1 << N>& ts)
         // Handle edges between face vertices and our corner vertex.
         for (auto faceAxisIdx = 0; faceAxisIdx < N; ++faceAxisIdx) {
             auto faceAxis = Axis::toAxis(faceAxisIdx);
-            std::array<SimplexDCIntersection<N>*, 4> intersectForDup;
+            std::array<const SimplexDCIntersection<N>*, 4> intersectForDup;
             intersectForDup.fill(nullptr);
             for (auto facePosition = 0; facePosition < 4; ++facePosition) {
                 auto shift = faceAxisIdx + 1;
@@ -418,13 +421,13 @@ void SimplexDCIntersecter<N>::load(const std::array<Input*, 1 << N>& ts)
                 }
                 auto faceSubIndex = (ipow(3, N) - 1) - 
                     ipow(3, Axis::toIndex(faceAxis)) * (int(useUpper) + 1);
-                const auto& faceSub = 
-                    *ts[faceIndex]->leaf->sub[faceSubIndex].load();
-                if (cornerSub.inside == faceSub.inside) {
+                auto faceSub = ts[faceIndex]->leaf->collapsedSub(faceSubIndex);
+                auto isSame = cornerSub == faceSub;
+                if (!isSame && cornerSub->inside == faceSub->inside) {
                     continue;
                 }
-                auto& inside = cornerSub.inside ? cornerSub.vert : faceSub.vert;
-                auto& outside = cornerSub.inside ? faceSub.vert : cornerSub.vert;
+                auto& inside = cornerSub->inside ? cornerSub->vert : faceSub->vert;
+                auto& outside = cornerSub->inside ? faceSub->vert : cornerSub->vert;
                 auto intersection = [&]() {
                     for (auto i : { 1, 2 }) {
                         auto& fromNeighbor = intersectForDup[facePosition ^ i];
@@ -439,8 +442,8 @@ void SimplexDCIntersecter<N>::load(const std::array<Input*, 1 << N>& ts)
                             return fromNeighbor;
                         }
                     }
-                    auto out = searchEdge(inside, outside,
-                                          ts[faceIndex]->leaf->tape);
+                    auto out = isSame ? &DCSimplex<N>::dupVertIntersection : 
+                        searchEdge(inside, outside, ts[faceIndex]->leaf->tape);
                     intersectForDup[facePosition] = out;
                     return out;
                 }();
@@ -471,18 +474,19 @@ void SimplexDCIntersecter<N>::load(const std::array<Input*, 1 << N>& ts)
     }
 
     // Now handle edges between cell vertices and our corner vertex.
-    std::array<SimplexDCIntersection<N>*, 1 << N> intersectForDup;
+    std::array<const SimplexDCIntersection<N>*, 1 << N> intersectForDup;
     intersectForDup.fill(nullptr);
     for (auto cell = 0; cell < ts.size(); ++cell) {
         if (ts[cell]->type == Interval::UNKNOWN) {
             continue;
         }
-        const auto& cellSub = *ts[cell]->leaf->sub[ipow(3, N) - 1].load();
-        if (cornerSub.inside == cellSub.inside) {
+        auto cellSub = ts[cell]->leaf->collapsedSub(ipow(3, N) - 1);
+        auto isSame = cornerSub == cellSub;
+        if (!isSame && cornerSub->inside == cellSub->inside) {
             continue;
         }
-        auto& inside = cornerSub.inside ? cornerSub.vert : cellSub.vert;
-        auto& outside = cornerSub.inside ? cellSub.vert : cornerSub.vert;
+        auto& inside = cornerSub->inside ? cornerSub->vert : cellSub->vert;
+        auto& outside = cornerSub->inside ? cellSub->vert : cornerSub->vert;
         auto intersection = [&]() {
             for (auto i = 0; i < N; ++i) {
                 auto axis = Axis::toAxis(i);
@@ -492,8 +496,8 @@ void SimplexDCIntersecter<N>::load(const std::array<Input*, 1 << N>& ts)
                     return intersectForDup[cell];
                 }
             }
-            auto out = searchEdge(inside, outside, 
-                                  ts[cell]->leaf->tape);
+            auto out = isSame ? &DCSimplex<N>::dupVertIntersection : 
+                searchEdge(inside, outside, ts[cell]->leaf->tape);
             intersectForDup[cell] = out;
             return out; 
         }();

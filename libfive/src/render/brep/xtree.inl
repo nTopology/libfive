@@ -93,6 +93,29 @@ void XTree<N, T, L>::setType(Interval::State t)
     done();
 }
 
+template<unsigned N, typename T, typename L>
+inline T* XTree<N, T, L>::neighbor(NeighborIndex neighbor)
+{
+    auto floating = neighbor.floating();
+    assert(highestbit(floating) <= N);
+    if (bitcount(floating) == N) {
+        return static_cast<T*>(this);
+    }
+    else if (parent == nullptr) {
+        return nullptr;
+    }
+    auto pos = neighbor.pos();
+    assert(highestbit(pos) <= N);
+    auto neighborFromParentFloat = floating | (pos ^ parent_index);
+    auto neighborFromParent = 
+        NeighborIndex::fromPosAndFloating(pos, neighborFromParentFloat);
+    auto parentNeighbor = parent->neighbor(neighborFromParent);
+    if (parentNeighbor == nullptr) {
+        return nullptr;
+    }
+    return parentNeighbor->child(floating ^ parent_index);
+}
+
 template <unsigned N, typename T, typename L>
 template <typename Pool>
 void XTree<N, T, L>::releaseChildren(Pool& object_pool)

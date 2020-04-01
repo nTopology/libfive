@@ -91,7 +91,7 @@ struct SimplexDCIntersection : Intersection<N>
     SimplexDCIntersection();
     void reset();
 
-    std::atomic<uint32_t> refcount = 0;
+    mutable std::atomic<uint32_t> refcount = 0;
 
     /*  Global indices for edge intersection vertices */
     std::atomic<uint64_t> index = 0;
@@ -102,8 +102,13 @@ struct SimplexDCIntersection : Intersection<N>
 template <unsigned N>
 struct DCSimplex
 {
-    std::array<std::atomic<SimplexDCIntersection<N>*>, 
+    std::array<std::atomic<const SimplexDCIntersection<N>*>,
                _simplexEdges(N)> intersections;
+
+    /* This dummy intersection represents an "intersection" coming from a
+     * simplex edge whose endpoints are not only both inside or both outside,
+     * but are actually identical due to vertex collapsing.*/
+    static const SimplexDCIntersection<N> dupVertIntersection;
 
     /* The vertices of the simplex are indexed by the dimensionalities of the 
      * subspaces they came from; this gives the intersection for a given 
@@ -115,12 +120,23 @@ struct DCSimplex
      * indicating whether the insertion was successful.  This handles both the
      * ref counting for the inserted intersection and thread-safety.*/
     std::pair<const SimplexDCIntersection<N>*, bool> insertIntersection(
-        unsigned a, unsigned b, SimplexDCIntersection<N>* intersection);
+        unsigned a, unsigned b, const SimplexDCIntersection<N>* intersection);
 
-    /* Number of non-null intersections, for assertions/debugging.*/
+    static bool isValid(const SimplexDCIntersection<N>* ptr) {
+        return ptr != nullptr && ptr != &dupVertIntersection;
+    }
+
+    /* Number of non-null non-duplicate-vertex intersections, 
+     * for assertions/debugging.*/
     int intersectionCount() const {
         return std::count_if(intersections.begin(), intersections.end(),
-            [](const auto& atomic_ptr) {return atomic_ptr.load() != nullptr; });
+            [](const auto& atomic_ptr) {return isValid(atomic_ptr.load()); });
+    }
+
+    int dupVertCount() const {
+        return std::count_if(intersections.begin(), intersections.end(),
+            [](const auto& atomic_ptr) 
+        {return atomic_ptr.load() == &dupVertIntersection; });
     }
 
     /*  Simplex vertex position */
@@ -240,6 +256,10 @@ struct SimplexDCLeaf
                                   SimplexDCMinEdge<N>,
                                   SimplexDCIntersection<N>>;
 
+    using SubPool = ObjectPool<SimplexLeafSubspace<N>,
+                               SimplexDCMinEdge<N>,
+                               SimplexDCIntersection<N>>;
+
     void releaseTo(Pool& object_pool);
 
     /*  One QEF structure per subspace in the leaf, shared between neighbors.
@@ -288,6 +308,19 @@ struct SimplexDCLeaf
     constexpr SimplexDCEdge<N>& edgeFromFaceAndIndex(
         Axis::Axis edgeAxis, Axis::Axis faceAxis,
         bool upperEdge, bool upperFace);
+
+    /*  Gets the subspace at the specified index, but in case of a collapsed
+     *  subspace vertex, gets the subspace whose vertex it collapses to 
+     *  instead.*/
+    SimplexLeafSubspace<N>* collapsedSub(unsigned index);
+
+    /*  Sets the given member of sub to the given pointer.  Not thread-safe.
+     *  The old subspace will not be released to the pool; as such, it will
+     *  not be reused, causing less than optimal memory efficiency if more
+     *  subspaces are allocated after this is called.  (In the current
+     *  usage, this does not happen).  Will not cause true memory leaks,
+     *  as the pool will still clean itself up when destroyed or reset.*/
+    void setSub(size_t index, SimplexLeafSubspace<N>* newSub);
 };
 
 template <unsigned N>

@@ -39,20 +39,22 @@ void SimplexDCVertexer<N>::load(const std::array<Input*, 1 << (N - 1)> & ts)
 
     auto edgeSubspaceIndex = (ipow(3, N) - 1) - totalReductions;
 
-    auto edgeSub = ts[index]->leaf->sub[edgeSubspaceIndex].load();
+    auto edgeSub = ts[index]->leaf->collapsedSub(edgeSubspaceIndex);
 
     auto lowCornerSubIndex = edgeSubspaceIndex - 2 * ipow(3, Axis::toIndex(A));
     auto highCornerSubIndex = edgeSubspaceIndex - ipow(3, Axis::toIndex(A));
 
     std::array<const SimplexLeafSubspace<N>*, 2> cornerSubs = {
-        ts[index]->leaf->sub[lowCornerSubIndex].load(),
-        ts[index]->leaf->sub[highCornerSubIndex].load()
+        ts[index]->leaf->collapsedSub(lowCornerSubIndex),
+        ts[index]->leaf->collapsedSub(highCornerSubIndex)
     };
 
     // In 3d, faceSubs follows the order axis=Q(A)/low R(A), 
     // axis=Q(A)/high R(A), axis=R(A)/low Q(A), axis=R(A)/high Q(A).
-    // In 2d, of course, it is ignored entirely.
-    std::array<const SimplexLeafSubspace<3>*, 4> faceSubs;
+    // In 2d, of course, it is ignored entirely (though sometimes
+    // copied to another variable that is then ignored; that should
+    // get optimized out).
+    std::array<const SimplexLeafSubspace<N>*, 4> faceSubs;
 
     if constexpr (N == 3) {
         for (auto i = 0; i < 4; ++i) {
@@ -74,7 +76,7 @@ void SimplexDCVertexer<N>::load(const std::array<Input*, 1 << (N - 1)> & ts)
             bool isUpperToFace(bestCellIdx & (i & 2 ? 2 : 1));
             auto faceSubspaceIndex = 
                 26 - ipow(3, Axis::toIndex(faceAxis)) * (isUpperToFace + 1);
-            faceSubs[i] = ts[bestCellIdx]->leaf->sub[faceSubspaceIndex].load();
+            faceSubs[i] = ts[bestCellIdx]->leaf->collapsedSub(faceSubspaceIndex);
         }
     }
 
@@ -82,7 +84,11 @@ void SimplexDCVertexer<N>::load(const std::array<Input*, 1 << (N - 1)> & ts)
         if (ts[cellIdx]->type == Interval::UNKNOWN) {
             continue;
         }
-        auto cellSub = ts[cellIdx]->leaf->sub[ipow(3, N) - 1].load();
+        auto cellSub = ts[cellIdx]->leaf->collapsedSub(ipow(3, N) - 1);
+        if (cellSub == edgeSub) {
+            // Degenerate simplices do not get vertices.
+            continue;
+        }
         for (auto faceAxisIdx = 0; faceAxisIdx < 2; ++faceAxisIdx) {
             auto faceAxis = faceAxisIdx ? R(A) : Q(A);
             if (N == 2 && faceAxis == Axis::Z) {
@@ -90,12 +96,23 @@ void SimplexDCVertexer<N>::load(const std::array<Input*, 1 << (N - 1)> & ts)
             }
             auto faceSubIdx = 
                 faceAxisIdx << 1 | int((cellIdx & (2 >> faceAxisIdx)) != 0);
-            if (N == 3 && faceSubs[faceSubIdx] == nullptr) {
+            auto faceSub = faceSubs[faceSubIdx];
+            if (N == 3 && faceSub == nullptr) {
                 // Face does not exist, so neither does the simplex we'd be
                 // handling.
                 continue;
             }
+            if (N == 3 && (faceSub == edgeSub || faceSub == cellSub)) {
+                // Degenerate simplices do not get vertices.
+                continue;
+            }
             for (auto corner = 0; corner < 2; ++corner) {
+                auto cornerSub = cornerSubs[corner];
+                if (cornerSub == edgeSub || cornerSub == cellSub ||
+                    (N == 3 && cornerSub == faceSub)) {
+                    // Degenerate simplices do not get vertices.
+                    continue;
+                }
                 auto& simplex = edge.simplexWithEdgeReducedCell(
                     A, faceAxis, cellIdx, corner);
                 assert(simplex.intersectionCount() == 3 ||
@@ -103,11 +120,10 @@ void SimplexDCVertexer<N>::load(const std::array<Input*, 1 << (N - 1)> & ts)
                     simplex.intersectionCount() == 0);
                 auto getVerts = [&]()->SubspaceVertArray {
                     if constexpr (N == 3) {
-                        return { cornerSubs[corner], edgeSub, 
-                                 faceSubs[faceSubIdx], cellSub };
+                        return { cornerSub, edgeSub, faceSub, cellSub };
                     }
                     else {
-                        return { cornerSubs[corner], edgeSub, cellSub };
+                        return { cornerSub, edgeSub, cellSub };
                     }
                 };
                 calcAndStoreVert(simplex, getVerts());
@@ -143,6 +159,7 @@ void SimplexDCVertexer<N>::calcAndStoreVert(
     for (auto a = 0; a < N; ++a) {
         for (auto b = a + 1; b <= N; ++b) {
             auto intersection = simplex.intersection(a, b);
+            assert(intersection != &DCSimplex<N>::dupVertIntersection);
             if (intersection != nullptr) {
                 qef += *intersection;
             }

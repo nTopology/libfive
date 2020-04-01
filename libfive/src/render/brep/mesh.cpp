@@ -33,6 +33,8 @@ You can obtain one at http://mozilla.org/MPL/2.0/.
 // Simplex DC meshing
 #include "libfive/render/brep/simplex_dc/simplex_dc_worker_pool.hpp"
 #include "libfive/render/brep/simplex_dc/simplex_dc_edges.hpp"
+#include "libfive/render/brep/simplex_dc/simplex_dc_sub_consolidator.hpp"
+#include "libfive/render/brep/simplex_dc/simplex_dc_collapser.hpp"
 #include "libfive/render/brep/simplex_dc/simplex_dc_intersecter.hpp"
 #include "libfive/render/brep/simplex_dc/simplex_dc_vertexer.hpp"
 #include "libfive/render/brep/simplex_dc/simplex_dc_mesher.hpp"
@@ -125,8 +127,9 @@ std::unique_ptr<Mesh> Mesh::render(
     }
     else if (settings.alg == SIMPLEX_DC) {
         if (settings.progress_handler) {
-            // Pool::build, Edges, Intersecter, Vertexer, Mesher, t.reset
-            settings.progress_handler->start({ 1, 1, 1, 1, 1, 1 });
+            // Pool::build, Edges, SubConsolidator Collapser 2 and 3, 
+            // Intersecter, Vertexer, Mesher, t.reset
+            settings.progress_handler->start({ 1, 1, 1, 1, 1, 1, 1, 1, 1 });
         }
         auto t = SimplexDCWorkerPool<3>::build(es, r, settings);
         if (settings.cancel.load() || t.get() == nullptr) {
@@ -139,6 +142,29 @@ std::unique_ptr<Mesh> Mesh::render(
         // Edges
         Dual<3>::walk<SimplexDCEdges<3>, decltype(t.pool())> (
             t, settings, t.pool());
+
+        if (settings.cancel.load()) {
+            if (settings.progress_handler) {
+                settings.progress_handler->finish();
+            }
+            t.reset(settings);
+            return nullptr;
+        }
+
+        Dual<3>::walk<SimplexDCSubConsolidator<3>>(t, settings);
+        
+        // Collapser for edges and faces
+        Dual<3>::walk_<SimplexDCCollapser<3, 2>>(
+            t, settings, 
+            [&](SimplexDCCollapser<3, 2>::PerThreadOutput& out, int i) {
+            return SimplexDCCollapser<3, 2>(out, &es[i]);
+        });
+        // Collapser for cells
+        Dual<3>::walk_<SimplexDCCollapser<3, 3>>(
+            t, settings,
+            [&](SimplexDCCollapser<3, 3>::PerThreadOutput& out, int i) {
+            return SimplexDCCollapser<3, 3>(out, &es[i]);
+        });
 
         if (settings.cancel.load()) {
             if (settings.progress_handler) {
