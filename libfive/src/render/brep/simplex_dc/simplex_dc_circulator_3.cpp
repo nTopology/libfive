@@ -732,6 +732,7 @@ std::array<int, 4> SimplexDCCirculator<3, true>::getIOFB() const
     return iofb;
 }
 
+template <>
 void SimplexDCCirculator<3, false>::insertIntersection(
     const SimplexDCIntersection<3>* intersection) const
 {

@@ -11,6 +11,7 @@ You can obtain one at http://mozilla.org/MPL/2.0/.
 #include <atomic>
 #include <array>
 #include <vector>
+#include <assert.h>
 
 #include "libfive/render/axes.hpp"
 

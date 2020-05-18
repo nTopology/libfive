@@ -203,7 +203,7 @@ const SimplexQEF<N - bitcount(mask)>& SimplexQEF<N>::sub() const
     else {
         constexpr auto fromHighest = 1 << highBit;
         static_assert(fromHighest & mask);
-        return sub<fromHighest>().sub<mask & ~fromHighest>();
+        return sub<fromHighest>().template sub<mask & ~fromHighest>();
     }
 }
 
@@ -237,7 +237,7 @@ typename SimplexQEF<N>::Point SimplexQEF<N>::convertFromSub(
         constexpr auto fromHighest = 1 << highBit;
         static_assert(fromHighest & mask);
         auto fromNext = sub<fromHighest>()
-            .convertFromSub<mask & ~fromHighest>(pt);
+            .template convertFromSub<mask & ~fromHighest>(pt);
         return convertFromSub<fromHighest>(fromNext);
     }
 }

@@ -168,18 +168,33 @@ protected:
     // and N is a maximum of 3, so it shouldn't be an issue.  We do need
     // special treatment for N == 0 to avoid endless recursion, though.
 
-    template <unsigned N2>
-    struct SubArray {
-        std::array<std::optional<SimplexQEF<N2 - 1>>, N2 + 1> subs;
+    // This gets tricky, since we need the special treatment inside the
+    // class to avoid a compiler error from recursing below 0, but we
+    // can't specialize within the class.  So instead we use constexpr if,
+    // auto return type, and decltype.
+
+    struct SubArrayAtPositive {
+        std::array<std::optional<SimplexQEF<N - 1>>, N + 1> subs;
         constexpr auto& operator[](size_t n) { return subs[n]; }
     };
 
-    template <>
-    class SubArray<0> {
-        // We should not be indexing into it in this case.
+    struct SubArrayAtZero{
+      // We should not be indexing into it in this case.
     };
 
-    mutable SubArray<N> subs;
+    static auto getSubArrayType() {
+        assert(false); // This should never be called.
+        if constexpr (N == 0) {
+            return SubArrayAtZero{};
+        }
+        else {
+            return SubArrayAtPositive{};
+        }
+    }
+
+    using SubArray = decltype(getSubArrayType());
+
+    mutable SubArray subs;
 
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 

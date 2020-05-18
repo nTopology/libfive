@@ -267,6 +267,7 @@ DCSimplex<2>* SimplexDCCirculator<2, true>::forwardSimplex(
     return nullptr;
 }
 
+template <>
 void SimplexDCCirculator<2, false>::insertIntersection(
     const SimplexDCIntersection<2>* intersection) const
 {

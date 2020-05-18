@@ -28,7 +28,7 @@ void SimplexDCIntersection<N>::reset()
     refcount = 0;
     index.store(0);
     orientationChecker.reset();
-    Intersection::reset();
+    Intersection<N>::reset();
 }
 
 template<unsigned N>
@@ -149,7 +149,7 @@ void SimplexDCLeaf<N>::reset()
     tape.reset();
     std::fill(sub.begin(), sub.end(), nullptr);
     for (auto& edge : edges) {
-        edge.emplace<SimplexDCMinEdge<N>::EdgeVec>();
+        edge.template emplace<typename SimplexDCMinEdge<N>::EdgeVec>();
     }
 }
 
@@ -173,7 +173,7 @@ void SimplexDCLeaf<N>::releaseTo(Pool& object_pool)
         else {
             // Clear any vector or stack to free memory, by turning it
             // into the pointer version.
-            edge.emplace<SimplexDCMinEdge<N>*>(nullptr);
+            edge.template emplace<SimplexDCMinEdge<N>*>(nullptr);
         }
     }
     object_pool.put(this);

@@ -492,12 +492,6 @@ void SimplexDCMesher::addPolygon(SimplexDCCirculator<3, true> circulator)
         return out;
     };
 
-    auto getIntersection = [](const auto& circulator) {
-        auto out = (*iter)->intersection(dim0, dim1);
-        assert(DCSimplex<3>::isValid(out));
-        return out;
-    };
-
     auto intersectionVert = 
         intersection->normalized_mass_point().template head<3>().eval();
     auto skippedCount = 0; // For debugging check.

@@ -149,30 +149,9 @@ protected:
     template <unsigned K>
     SimplexLeafSubspace<3>* getSub() const;
 
-    // We'll want to specialize our getSub's, so declare specializations
-    // before using them.
-    template <> SimplexLeafSubspace<3>* getSub<0>() const;
-    template <> SimplexLeafSubspace<3>* getSub<1>() const;
-    template <> SimplexLeafSubspace<3>* getSub<2>() const;
-    template <> SimplexLeafSubspace<3>* getSub<3>() const;
-
-    // getSub with runtime-determined dimension.
-    SimplexLeafSubspace<3>* getSub(unsigned k) const {
-        switch (k) {
-        case 0:
-            return getSub<0>();
-        case 1:
-            return getSub<1>();
-        case 2:
-            return getSub<2>();
-        case 3:
-            return getSub<3>();
-        default:
-            assert(false);
-            return nullptr;
-        }
-    }
-
+    // getSub with runtime-determined dimension.  Defined after we specialize
+    // (and thus explicitly instantiate) our templated version.
+    SimplexLeafSubspace<3>* getSub(unsigned k) const;
 
     unsigned insideDimension;
     unsigned outsideDimension;
@@ -195,6 +174,35 @@ protected:
 
     const DCSimplex<3>* startSimplex;
 };
+
+// We'll want to specialize our getSub's, so declare specializations
+// before using them.
+template <>
+SimplexLeafSubspace<3>* SimplexDCCirculator<3, true>::getSub<0>() const;
+template <>
+SimplexLeafSubspace<3>* SimplexDCCirculator<3, true>::getSub<1>() const;
+template <>
+SimplexLeafSubspace<3>* SimplexDCCirculator<3, true>::getSub<2>() const;
+template <>
+SimplexLeafSubspace<3>* SimplexDCCirculator<3, true>::getSub<3>() const;
+
+// getSub with runtime-determined dimension.
+inline
+SimplexLeafSubspace<3>* SimplexDCCirculator<3, true>::getSub(unsigned k) const {
+  switch (k) {
+  case 0:
+    return getSub<0>();
+  case 1:
+    return getSub<1>();
+  case 2:
+    return getSub<2>();
+  case 3:
+    return getSub<3>();
+  default:
+    assert(false);
+    return nullptr;
+  }
+}
 
 template <>
 class SimplexDCCirculator<2, true>
@@ -265,7 +273,7 @@ public:
     }
 
     DCSimplex<N>* simplex() const {
-        return mutableSimplex();
+        return this->mutableSimplex();
     }
 
     void insertIntersection(const SimplexDCIntersection<N>* intersection) const;

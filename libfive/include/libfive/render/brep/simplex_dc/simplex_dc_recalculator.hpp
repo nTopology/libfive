@@ -9,6 +9,7 @@ You can obtain one at http://mozilla.org/MPL/2.0/.
 #pragma once
 #include <vector>
 #include <optional>
+#include <memory>
 #include "libfive/render/brep/simplex/qef.hpp"
 
 namespace libfive {

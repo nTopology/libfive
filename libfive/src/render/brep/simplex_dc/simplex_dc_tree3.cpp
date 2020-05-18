@@ -26,12 +26,12 @@ bool OrientationChecker<3>::check(
     return xProd.dot(direction) > 0.;
 }
 
-const SimplexDCIntersection<3> DCSimplex<3>::dupVertIntersection;
+template<>
+const SimplexDCIntersection<3> DCSimplex<3>::dupVertIntersection{};
 
 template class SimplexTree<3, SimplexDCLeaf<3>>;
 template struct SimplexDCLeaf<3>;
 template struct SimplexDCIntersection<3>;
 template struct SimplexDCMinEdge<3>;
 template struct DCSimplex<3>;
-template class SimplexDCMinEdge<3>::EdgeVec;
 }   // namespace libfive

@@ -771,7 +771,7 @@ SimplexDCIntersection<N>* SimplexDCIntersecter<N>::searchEdge(
         }
     }
 
-    auto ptDouble = intersection->normalized_mass_point().head<N>();
+    auto ptDouble = intersection->normalized_mass_point().template head<N>();
     auto pt = ptDouble.template cast<float>().eval();
 
     decltype(inside) closeSub = nullptr;

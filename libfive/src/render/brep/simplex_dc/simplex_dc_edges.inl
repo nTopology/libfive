@@ -66,12 +66,12 @@ void SimplexDCEdges<N>::load(const std::array<Input*, 1 << (N - 1)>& ts)
         if (t->leafLevel() == minLevel) {
             assert(std::holds_alternative<SimplexDCMinEdge<N>::EdgeVec>(edge));
             assert(std::get<SimplexDCMinEdge<N>::EdgeVec>(edge).empty());
-            edge.emplace<SimplexDCMinEdge<N>*>(ptr);
+            edge.template emplace<SimplexDCMinEdge<N>*>(ptr);
             ++count;
         }
         else {
             assert(std::holds_alternative<SimplexDCMinEdge<N>::EdgeVec>(edge));
-            std::get<SimplexDCMinEdge<N>::EdgeVec>(edge).push_back(ptr);
+            std::get<typename SimplexDCMinEdge<N>::EdgeVec>(edge).push_back(ptr);
             // Do not increment count, as the EdgeVec is non-owning.
         }
     }
