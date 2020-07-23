@@ -558,10 +558,10 @@ bool SimplexTree<N, Leaf>::collectChildren(Evaluator* eval,
   return true;
 }
 
-template<unsigned N, class Leaf>
-void SimplexTree<N, Leaf>::saveVertexSigns(
+template<>
+void SimplexTree<3, SimplexDCLeaf<3>>::saveVertexSigns(
   Evaluator* eval, const Tape::Handle& tape,
-  const std::array<bool, ipow(3, N)>& already_solved)
+  const std::array<bool, ipow(3, 3)>& already_solved)
 {
   // With every vertex positioned, solve for whether it is inside or outside.
   assert(this->leaf != nullptr);
@@ -576,7 +576,7 @@ void SimplexTree<N, Leaf>::saveVertexSigns(
   };
 
   unsigned num = 0;
-  for (unsigned i = 0; i < ipow(3, N); ++i)
+  for (unsigned i = 0; i < ipow(3, 3); ++i)
   {
     // Skip subspaces that have already been solved,
     // which include corners (since they have the solution
@@ -592,7 +592,7 @@ void SimplexTree<N, Leaf>::saveVertexSigns(
   values.leftCols(num) = eval->values(num, *tape);
 
   num = 0;
-  for (unsigned i = 0; i < ipow(3, N); ++i)
+  for (unsigned i = 0; i < ipow(3, 3); ++i)
   {
     double out;
     // Skip subspaces that have already been solved
@@ -617,8 +617,8 @@ void SimplexTree<N, Leaf>::saveVertexSigns(
   }
 }
 
-template<unsigned N, class Leaf>
-void SimplexTree<N, Leaf>::checkVertexSigns() {
+template<>
+void SimplexTree<3, SimplexDCLeaf<3>>::checkVertexSigns() {
   // Check all subspace vertices to decide whether this leaf is
   // completely empty or full.  This isn't as conclusive as the
   // interval arithmetic, but if there were parts of the model
