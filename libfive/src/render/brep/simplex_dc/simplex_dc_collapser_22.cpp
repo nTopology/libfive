@@ -8,6 +8,7 @@ License, v. 2.0. If a copy of the MPL was not distributed with this file,
 You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 #include "simplex_dc_collapser.inl"
+#include "simplex_dc_tree2.cpp"
 
 namespace libfive {
 template class SimplexDCCollapser<2, 2>;
