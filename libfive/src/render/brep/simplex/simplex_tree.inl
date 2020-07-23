@@ -577,6 +577,7 @@ void SimplexTree<N, Leaf>::saveVertexSigns(
         Evaluator* eval, const Tape::Handle& tape,
         const std::array<bool, ipow(3, N)>& already_solved)
 {
+  static_assert(std::is_same_v<Leaf, SimplexLeaf<N>>);
     // With every vertex positioned, solve for whether it is inside or outside.
     assert(this->leaf != nullptr);
     assert(this->type == Interval::AMBIGUOUS);
