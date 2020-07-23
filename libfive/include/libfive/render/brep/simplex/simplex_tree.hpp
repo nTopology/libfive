@@ -219,7 +219,7 @@ public:
     void saveVertexSigns(Evaluator* eval,
         const Tape::Handle& tape,
         const std::array<bool, ipow(3, N)>& already_solved);
-protected:
+public:
 
     /*  We make a copy of the children when collecting them, in order to avoid
      *  atomics.  This typedef makes it easier to pass that on to other methods.
@@ -332,63 +332,75 @@ protected:
                            const ChildSubArray<N>& childSubsInside);
 };
 
+template <unsigned N, class Leaf>
+struct VertSignHelper;
+
+template <unsigned N, class Leaf>
+struct VertSignHelper
+{
+  static void saveVertexSigns(SimplexTree<N, Leaf>& tree, Evaluator* eval, const Tape::Handle& tape,
+    const std::array<bool, ipow(3, N)>& already_solved) {
+    // With every vertex positioned, solve for whether it is inside or outside.
+    assert(this->leaf != nullptr);
+    assert(this->type == Interval::AMBIGUOUS);
+
+    const auto leaf_sub = tree.getLeafSubs();
+    auto pos = [&leaf_sub, &tree](unsigned i) {
+      Eigen::Vector3f p;
+      p << leaf_sub[i]->vert.template cast<float>().transpose(),
+        tree.region.perp.template cast<float>();
+      return p;
+    };
+
+    unsigned num = 0;
+    for (unsigned i = 0; i < ipow(3, N); ++i)
+    {
+      // Skip subspaces that have already been solved,
+      // which include corners (since they have the solution
+      // in their QEF data)
+      if (already_solved[i] || NeighborIndex(i).isCorner()) {
+        continue;
+      }
+
+      eval->set(pos(i), num++);
+    }
+
+    Eigen::Matrix<float, 1, ArrayEvaluator::N> values;
+    values.leftCols(num) = eval->values(num, *tape);
+
+    num = 0;
+    for (unsigned i = 0; i < ipow(3, N); ++i)
+    {
+      double out;
+      // Skip subspaces that have already been solved
+      if (already_solved[i]) {
+        continue;
+      }
+
+      if (NeighborIndex(i).isCorner()) {
+        out = leaf_sub[i]->qef.averageDistanceValue();
+      }
+      else {
+        out = values[num++];
+      }
+
+      // Handle ambiguities with the high-power isInside check
+      if (out == 0) {
+        leaf_sub[i]->inside = eval->isInside(pos(i), tape);
+      }
+      else {
+        leaf_sub[i]->inside = (out < 0);
+      }
+    }
+  }
+};
+
 template<unsigned N, class Leaf>
 void SimplexTree<N, Leaf>::saveVertexSigns(
   Evaluator* eval, const Tape::Handle& tape,
   const std::array<bool, ipow(3, N)>& already_solved)
 {
-  // With every vertex positioned, solve for whether it is inside or outside.
-  assert(this->leaf != nullptr);
-  assert(this->type == Interval::AMBIGUOUS);
-
-  const auto leaf_sub = getLeafSubs();
-  auto pos = [&leaf_sub, this](unsigned i) {
-    Eigen::Vector3f p;
-    p << leaf_sub[i]->vert.template cast<float>().transpose(),
-      this->region.perp.template cast<float>();
-    return p;
-  };
-
-  unsigned num = 0;
-  for (unsigned i = 0; i < ipow(3, N); ++i)
-  {
-    // Skip subspaces that have already been solved,
-    // which include corners (since they have the solution
-    // in their QEF data)
-    if (already_solved[i] || NeighborIndex(i).isCorner()) {
-      continue;
-    }
-
-    eval->set(pos(i), num++);
-  }
-
-  Eigen::Matrix<float, 1, ArrayEvaluator::N> values;
-  values.leftCols(num) = eval->values(num, *tape);
-
-  num = 0;
-  for (unsigned i = 0; i < ipow(3, N); ++i)
-  {
-    double out;
-    // Skip subspaces that have already been solved
-    if (already_solved[i]) {
-      continue;
-    }
-
-    if (NeighborIndex(i).isCorner()) {
-      out = leaf_sub[i]->qef.averageDistanceValue();
-    }
-    else {
-      out = values[num++];
-    }
-
-    // Handle ambiguities with the high-power isInside check
-    if (out == 0) {
-      leaf_sub[i]->inside = eval->isInside(pos(i), tape);
-    }
-    else {
-      leaf_sub[i]->inside = (out < 0);
-    }
-  }
+  VertSignHelper<N, Leaf>::saveVertexSigns(*this, eval, tape, already_solved);
 }
 
 }   // namespace libfive
