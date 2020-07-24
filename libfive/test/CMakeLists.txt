@@ -44,3 +44,5 @@ endif(BUILD_GUILE_BINDINGS AND GUILE_FOUND)
 add_executable(libfive-test ${SRCS})
 target_link_libraries(libfive-test ${LIBS})
 target_include_directories(libfive-test PRIVATE .)
+
+target_compile_features(libfive-test PUBLIC cxx_std_17)
