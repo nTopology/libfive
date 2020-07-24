@@ -12,9 +12,6 @@ set(five_sources
     eval/tape.cpp
     eval/feature.cpp
 
-    render/discrete/heightmap.cpp
-    render/discrete/voxels.cpp
-
     render/brep/contours.cpp
     render/brep/edge_tables.cpp
     render/brep/manifold_tables.cpp
@@ -96,8 +93,6 @@ set(five_sources
     render/brep/vol/vol_tree.cpp
     render/brep/vol/vol_worker_pool.cpp
 
-    solve/solver.cpp
-
     tree/cache.cpp
     tree/opcode.cpp
     tree/archive.cpp
@@ -108,8 +103,6 @@ set(five_sources
     oracle/oracle_clause.cpp
     oracle/transformed_oracle.cpp
     oracle/transformed_oracle_clause.cpp
-
-    libfive.cpp
 
     ############### .inl files ###############################
 
@@ -152,9 +145,6 @@ set(five_sources
     ../include/libfive/eval/tape.hpp
 
     ../include/libfive/render/axes.hpp
-
-    ../include/libfive/render/discrete/heightmap.hpp
-    ../include/libfive/render/discrete/voxels.hpp
 
     ../include/libfive/render/brep/brep.hpp
     ../include/libfive/render/brep/contours.hpp
@@ -218,8 +208,6 @@ set(five_sources
    ../include/libfive/render/brep/vol/vol_tree.hpp
     ../include/libfive/render/brep/vol/vol_worker_pool.hpp
 
-    ../include/libfive/solve/solver.hpp
-
     ../include/libfive/tree/archive.hpp
     ../include/libfive/tree/cache.hpp
     ../include/libfive/tree/deserializer.hpp
@@ -233,8 +221,6 @@ set(five_sources
     ../include/libfive/oracle/oracle_storage.hpp
     ../include/libfive/oracle/transformed_oracle.hpp
     ../include/libfive/oracle/transformed_oracle_clause.hpp
-
-    ../include/libfive.h
 )
 
 if(LIBFIVE_BUILD_STATIC_LIB)
