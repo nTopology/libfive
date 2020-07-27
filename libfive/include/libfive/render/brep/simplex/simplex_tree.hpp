@@ -212,13 +212,15 @@ public:
     static SimplexTree<N, Leaf>* singletonFilled() { return nullptr; }
     static bool isSingleton(const SimplexTree<N, Leaf>*) { return false; }
 
+    static constexpr unsigned leafSize = ipow(3, N);
+
     /*
      *  Calculate and store whether each vertex is inside or outside
      *  This populates leaf->sub[i]->inside, for i in 0..ipow(3, N)
      */
     void saveVertexSigns(Evaluator* eval,
         const Tape::Handle& tape,
-        const std::array<bool, ipow(3, N)>& already_solved);
+        const std::array<bool, leafSize>& already_solved);
 protected:
 
     /*  We make a copy of the children when collecting them, in order to avoid
