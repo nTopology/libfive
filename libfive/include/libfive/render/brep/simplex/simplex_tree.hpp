@@ -212,24 +212,13 @@ public:
     static SimplexTree<N, Leaf>* singletonFilled() { return nullptr; }
     static bool isSingleton(const SimplexTree<N, Leaf>*) { return false; }
 
-    template <unsigned K> struct LeafArrayHelper;
-
-    template <> struct LeafArrayHelper<2> {
-      using Type = std::array<bool, 9>;
-    };
-
-    template <> struct LeafArrayHelper<3> {
-      using Type = std::array<bool, 27>;
-    };
-
-
     /*
      *  Calculate and store whether each vertex is inside or outside
      *  This populates leaf->sub[i]->inside, for i in 0..ipow(3, N)
      */
     void saveVertexSigns(Evaluator* eval,
         const Tape::Handle& tape,
-        const typename LeafArrayHelper<N>::Type& already_solved);
+        const std::array<bool, N == 2 ? 9 : 27>& already_solved);
 protected:
 
     /*  We make a copy of the children when collecting them, in order to avoid
