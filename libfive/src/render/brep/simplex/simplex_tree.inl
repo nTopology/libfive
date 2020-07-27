@@ -575,7 +575,7 @@ bool SimplexTree<N, Leaf>::collectChildren(Evaluator* eval,
 template<unsigned N, class Leaf>
 void SimplexTree<N, Leaf>::saveVertexSigns(
         Evaluator* eval, const Tape::Handle& tape,
-        const std::array<bool, ipow(3, N)>& already_solved)
+        const typename LeafArrayHelper<N>::Type& already_solved)
 {
     // With every vertex positioned, solve for whether it is inside or outside.
     assert(this->leaf != nullptr);
