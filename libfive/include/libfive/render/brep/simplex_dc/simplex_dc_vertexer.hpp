@@ -30,7 +30,8 @@ class SimplexDCVertexer
 {
 public:
     using Input = SimplexTree<N, SimplexDCLeaf<N>>;
-    // The BRep output by the vertexer has vertices only, no branes.
+    // The BRep output by the vertexer can have both vertices and branes, though
+    // neither is the entirety of the mesh's vertices/branes.
     using Output = BRep<N>;
     using PerThreadOutput = PerThreadBRep<N>;
     /*
@@ -77,11 +78,17 @@ protected:
      */
 
     using SubspaceVertArray = std::array<const SimplexLeafSubspace<N>*, N + 1>;
+
     /*
-     *  Calculates and stores the vertex for a given simplex.
+     *  Calculates and stores the vertex for a given simplex.  "Orientation" is
+     *  true if the corner vertex is at the origin, the edge vertex on +X,
+     *  the face vertex on +Y and (in 3D) the cell vertex on +Z (or if the 
+     *  vertices are arranged in any way with the same orientation), and false
+     *  if the vertices have the opposite orientation.
      */
-    void calcAndStoreVert(
-        DCSimplex<N>& simplex, SubspaceVertArray vertsFromSubspaces);
+    void calcAndStoreVert(DCSimplex<N>& simplex, 
+                          SubspaceVertArray vertsFromSubspaces, 
+                          bool orientation);
 
     PerThreadBRep<N>& m;
 

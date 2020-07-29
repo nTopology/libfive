@@ -96,6 +96,11 @@ struct SimplexDCIntersection : Intersection<N>
     /*  Global indices for edge intersection vertices */
     std::atomic<uint64_t> index = 0;
 
+    /*  Equivalent to AtA, built from normalized derivatives.  Used for
+     *  calculating ranks, to avoid issues when derivatives have very
+     *  different scales.*/
+    Eigen::Matrix<double, N, N> AtANormalized;
+
     OrientationChecker<N> orientationChecker;
 };
 
@@ -149,7 +154,7 @@ struct DCSimplex
 };
 
 template <unsigned N>
-struct SimplexDCMinEdge
+struct SimplexDCEdge
 {
     /* The index for a simplex is assigned with the lowest N bits indicating
      * the cell center and corner used; in 2d this is the lowest bit for the
@@ -166,14 +171,10 @@ struct SimplexDCMinEdge
 
     std::atomic<uint32_t> refcount;
 
-    /* The lowest value along the edge of the coordinate corresponding to the
-     * edge's axis.  Used to sort. */
-    double lowPt;
-
-    SimplexDCMinEdge();
+    SimplexDCEdge();
     void reset();
 
-    using Pool = ObjectPool<SimplexDCMinEdge<N>, SimplexDCIntersection<N>>;
+    using Pool = ObjectPool<SimplexDCEdge<N>, SimplexDCIntersection<N>>;
 
     void releaseTo(Pool& object_pool);
 
@@ -204,40 +205,7 @@ struct SimplexDCMinEdge
         bool isUpperCell, unsigned reducedCorner);
 
     DEFAULT_OPERATORS_NEW_AND_DELETE
-
-    /*  Non-owning vector of edges.  It is thread-safe with respect to multiple
-     *  pushes/sorts, but not with respect to reading and pushing at the same 
-     *  time.  Reading and sorting at the same time is thread-safe only if
-     *  the sort() function has already returned (after being called on this
-     *  object) at least once.  It should not be pushed to after being sorted;
-     *  if it is, the validity of the sort is no longer guaranteed, even if 
-     *  sort() is called again.*/
-    class EdgeVec {
-    public:
-        void push_back(SimplexDCMinEdge* ptr);
-        auto begin() const { return vec.begin(); }
-        auto end() const { return vec.end(); }
-        auto rbegin() const { return vec.rbegin(); }
-        auto rend() const { return vec.rend(); }
-        auto empty() const { return vec.empty(); }
-        // Sorts according to the lowPt member of its members.
-        void sort();
-    private:
-        bool isSorted;
-        std::mutex mut;
-        std::vector<SimplexDCMinEdge*> vec;
-    };
 };
-
-/*  This is intentionally set to use the stack version by default.  That way,
- *  the potentially-multithreaded use of the stack will not need to use any
- *  thread-unsafe variant operations, while switching to the single-pointer
- *  option will only happen when the corresponding edge is minimal and 
- *  therefore will only be accessed once.  Pointers in the EdgeVec are
- *  non-owning, while those held directly are owning.*/
-template <unsigned N>
-using SimplexDCEdge = std::variant<typename SimplexDCMinEdge<N>::EdgeVec,
-                                   SimplexDCMinEdge<N>*>;
 
 template <unsigned N>
 struct SimplexDCLeaf
@@ -247,17 +215,17 @@ struct SimplexDCLeaf
 
     using Pool = ObjectPool<SimplexDCLeaf, 
                             SimplexLeafSubspace<N>,
-                            SimplexDCMinEdge<N>,
+                            SimplexDCEdge<N>,
                             SimplexDCIntersection<N>>;
 
     using ParentPool = ObjectPool<SimplexTree<N, SimplexDCLeaf>, 
                                   SimplexDCLeaf, 
                                   SimplexLeafSubspace<N>,
-                                  SimplexDCMinEdge<N>,
+                                  SimplexDCEdge<N>,
                                   SimplexDCIntersection<N>>;
 
     using SubPool = ObjectPool<SimplexLeafSubspace<N>,
-                               SimplexDCMinEdge<N>,
+                               SimplexDCEdge<N>,
                                SimplexDCIntersection<N>>;
 
     void releaseTo(Pool& object_pool);
@@ -278,7 +246,7 @@ struct SimplexDCLeaf
      *  2d to whether the perpendicular value is at the lower (0) or upper (1) 
      *  end of the cell, and in 3d is 2R+Q, where Q and R represent the value 
      *  of Q(A) and R(A).*/
-    std::array<SimplexDCEdge<N>, _edges(N)> edges;
+    std::array<SimplexDCEdge<N>*, _edges(N)> edges;
 
     DEFAULT_OPERATORS_NEW_AND_DELETE
 
@@ -289,13 +257,13 @@ struct SimplexDCLeaf
      *  edge(axis) and edge(axis^corner) thus give the same result.  If axis
      *  is not a valid axis, or corner is not a valid n-dimensional corner,
      *  behavior is undefined.*/
-    constexpr SimplexDCEdge<N>& edge(Axis::Axis axis, unsigned corner);
+    constexpr SimplexDCEdge<N>*& edge(Axis::Axis axis, unsigned corner);
 
     /*  This variant takes a reduced N-1-dimensional corner, referring to the
      *  non-axis dimensions beginning with the one after the axis dimension
      *  (and wrapping around if needed).*/
-    constexpr SimplexDCEdge<N>& edgeFromReduced(Axis::Axis axis, 
-                                                unsigned reducedCorner) 
+    constexpr SimplexDCEdge<N>*& edgeFromReduced(Axis::Axis axis,
+                                                    unsigned reducedCorner) 
     {
         return edges[(Axis::toIndex(axis) << (N - 1)) | reducedCorner];
     }
@@ -305,7 +273,7 @@ struct SimplexDCLeaf
      *  an axis for the edge, and whether the edge takes the higher or lower
      *  value on the unused axis.  This has undefined behavior when N == 3, and
      *  if edgeAxis == faceAxis or either is not a valid axis.*/
-    constexpr SimplexDCEdge<N>& edgeFromFaceAndIndex(
+    constexpr SimplexDCEdge<N>*& edgeFromFaceAndIndex(
         Axis::Axis edgeAxis, Axis::Axis faceAxis,
         bool upperEdge, bool upperFace);
 
@@ -342,7 +310,8 @@ constexpr unsigned lowestBits(unsigned N) {
 }
 
 template<unsigned N>
-constexpr SimplexDCEdge<N>& SimplexDCLeaf<N>::edge(Axis::Axis axis, unsigned corner)
+constexpr SimplexDCEdge<N>*& SimplexDCLeaf<N>::edge(
+  Axis::Axis axis, unsigned corner)
 {
     corner |= (corner << N);
     corner >>= (Axis::toIndex(axis) + 1);
@@ -351,7 +320,7 @@ constexpr SimplexDCEdge<N>& SimplexDCLeaf<N>::edge(Axis::Axis axis, unsigned cor
 }
 
 template<unsigned N>
-inline constexpr SimplexDCEdge<N>& SimplexDCLeaf<N>::edgeFromFaceAndIndex(
+inline constexpr SimplexDCEdge<N>*& SimplexDCLeaf<N>::edgeFromFaceAndIndex(
     Axis::Axis edgeAxis, Axis::Axis faceAxis, bool upperEdge, bool upperFace)
 {
     auto corner = upperEdge ? lowestBits(N) : 0;
@@ -365,7 +334,7 @@ inline constexpr SimplexDCEdge<N>& SimplexDCLeaf<N>::edgeFromFaceAndIndex(
 }
 
 template<unsigned N>
-inline constexpr DCSimplex<N>& SimplexDCMinEdge<N>::simplex(
+inline constexpr DCSimplex<N>& SimplexDCEdge<N>::simplex(
     Axis::Axis edgeAxis, Axis::Axis faceAxis, unsigned cell, bool isUpperCorner)
 {
     cell |= (cell << N);
@@ -375,7 +344,7 @@ inline constexpr DCSimplex<N>& SimplexDCMinEdge<N>::simplex(
 }
 
 template<unsigned N>
-inline constexpr DCSimplex<N>& SimplexDCMinEdge<N>::simplexWithEdgeReducedCell(
+inline constexpr DCSimplex<N>& SimplexDCEdge<N>::simplexWithEdgeReducedCell(
     Axis::Axis edgeAxis, Axis::Axis faceAxis, unsigned cell, bool isUpperCorner)
 {
     auto index = (cell << 1) | int(isUpperCorner);
@@ -388,7 +357,7 @@ inline constexpr DCSimplex<N>& SimplexDCMinEdge<N>::simplexWithEdgeReducedCell(
 }
 
 template<unsigned N>
-inline constexpr DCSimplex<N>& SimplexDCMinEdge<N>::simplexWithFaceReducedCell(
+inline constexpr DCSimplex<N>& SimplexDCEdge<N>::simplexWithFaceReducedCell(
     Axis::Axis edgeAxis, Axis::Axis faceAxis, 
     bool isUpperCell, unsigned reducedCorner)
 {

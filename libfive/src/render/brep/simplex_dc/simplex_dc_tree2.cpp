@@ -47,6 +47,6 @@ const SimplexDCIntersection<2> DCSimplex<2>::dupVertIntersection{};
 template class SimplexTree<2, SimplexDCLeaf<2>>;
 template struct SimplexDCLeaf<2>;
 template struct SimplexDCIntersection<2>;
-template struct SimplexDCMinEdge<2>;
+template struct SimplexDCEdge<2>;
 template struct DCSimplex<2>;
 }   // namespace libfive

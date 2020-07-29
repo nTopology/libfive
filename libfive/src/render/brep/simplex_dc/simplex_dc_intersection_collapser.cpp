@@ -251,7 +251,7 @@ void SimplexDCMesher::load(const std::array<Input*, 8>& ts) {
     const auto& cornerSub = *ts[index]->leaf->collapsedSub(cornerSubspaceIndex);
     constexpr std::array tsIndices{ 0, 1, 2, 3, 4, 5, 6, 7 };
 
-    std::array<SimplexDCMinEdge<3>*, 6> edges;
+    std::array<SimplexDCEdge<3>*, 6> edges;
 
     // Handle edges between edge vertices and our corner vertex.
     for (auto edgeAxisIdx = 0; edgeAxisIdx < 3; ++edgeAxisIdx) {
@@ -289,10 +289,8 @@ void SimplexDCMesher::load(const std::array<Input*, 8>& ts) {
                 continue;
             }
             auto lowerCorner = ~edgeIndex & ~edgeAxis & 7;
-            const auto& edgeVariant =
+            const auto& edge =
                 ts[edgeIndex]->leaf->edge(edgeAxis, lowerCorner);
-            assert(std::holds_alternative<SimplexDCMinEdge<3>*>(edgeVariant));
-            const auto& edge = std::get<SimplexDCMinEdge<3>*>(edgeVariant);
             edges[edgeAxisIdx * 2 + edgePosition] = edge;
             auto edgeSubIndex = CornerIndex(lowerCorner).neighbor().i + 
                 2 * ipow(3, Axis::toIndex(edgeAxis));

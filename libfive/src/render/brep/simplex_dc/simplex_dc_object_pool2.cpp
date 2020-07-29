@@ -12,26 +12,26 @@ You can obtain one at http://mozilla.org/MPL/2.0/.
 
 namespace libfive {
 template class ObjectPool<SimplexTree<2, SimplexDCLeaf<2>>, SimplexDCLeaf<2>, 
-                          SimplexLeafSubspace<2>, SimplexDCMinEdge<2>, 
+                          SimplexLeafSubspace<2>, SimplexDCEdge<2>, 
                           SimplexDCIntersection<2>>;
 template class ObjectPool<SimplexDCLeaf<2>, SimplexLeafSubspace<2>, 
-                          SimplexDCMinEdge<2>, SimplexDCIntersection<2>>;
-template class ObjectPool<SimplexLeafSubspace<2>, SimplexDCMinEdge<2>,
+                          SimplexDCEdge<2>, SimplexDCIntersection<2>>;
+template class ObjectPool<SimplexLeafSubspace<2>, SimplexDCEdge<2>,
                           SimplexDCIntersection<2>>;
-template class ObjectPool<SimplexDCMinEdge<2>, SimplexDCIntersection<2>>;
+template class ObjectPool<SimplexDCEdge<2>, SimplexDCIntersection<2>>;
 template class ObjectPool<SimplexDCIntersection<2>>;
 
 template SimplexTree<2, SimplexDCLeaf<2>>*
 ObjectPool<SimplexTree<2, SimplexDCLeaf<2>>, SimplexDCLeaf<2>,
-    SimplexLeafSubspace<2>, SimplexDCMinEdge<2>,
+    SimplexLeafSubspace<2>, SimplexDCEdge<2>,
     SimplexDCIntersection<2>>::get(
         SimplexTree<2, SimplexDCLeaf<2>>*, unsigned, Region<2>);
 template SimplexDCLeaf<2>* ObjectPool<SimplexDCLeaf<2>,
-    SimplexLeafSubspace<2>, SimplexDCMinEdge<2>,
+    SimplexLeafSubspace<2>, SimplexDCEdge<2>,
     SimplexDCIntersection<2>>::get();
 template SimplexLeafSubspace<2>* ObjectPool<SimplexLeafSubspace<2>,
-    SimplexDCMinEdge<2>, SimplexDCIntersection<2>>::get();
-template SimplexDCMinEdge<2>* ObjectPool<SimplexDCMinEdge<2>,
+    SimplexDCEdge<2>, SimplexDCIntersection<2>>::get();
+template SimplexDCEdge<2>* ObjectPool<SimplexDCEdge<2>,
     SimplexDCIntersection<2>>::get();
 template SimplexDCIntersection<2>* ObjectPool<SimplexDCIntersection<2>>::get();
 }   // namespace libfive

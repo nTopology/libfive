@@ -39,7 +39,6 @@ void SimplexDCEdges<N>::load(const std::array<Input*, 1 << (N - 1)>& ts)
     { return a->leafLevel() < b->leafLevel(); }) - ts.begin();
     auto minLevel = ts[minIdx]->leafLevel();
     auto ptr = my_pool.get();
-    ptr->lowPt = ts[minIdx]->region.lower[Axis::toIndex(A)];
     auto& count = ptr->refcount;
     std::array<bool, 1 << (N - 1)> toUse;
     toUse.fill(true);
@@ -64,15 +63,13 @@ void SimplexDCEdges<N>::load(const std::array<Input*, 1 << (N - 1)>& ts)
         }
         auto& edge = t->leaf->edgeFromReduced(A, ts.size() - 1 - index);
         if (t->leafLevel() == minLevel) {
-            assert(std::holds_alternative<SimplexDCMinEdge<N>::EdgeVec>(edge));
-            assert(std::get<SimplexDCMinEdge<N>::EdgeVec>(edge).empty());
-            edge.template emplace<SimplexDCMinEdge<N>*>(ptr);
+            assert(edge == nullptr);
+            edge = ptr;
             ++count;
         }
         else {
-            assert(std::holds_alternative<SimplexDCMinEdge<N>::EdgeVec>(edge));
-            std::get<typename SimplexDCMinEdge<N>::EdgeVec>(edge).push_back(ptr);
-            // Do not increment count, as the EdgeVec is non-owning.
+            assert(edge == nullptr);
+            // Do nothing; we should never be accessing a non-minimal edge.
         }
     }
 }

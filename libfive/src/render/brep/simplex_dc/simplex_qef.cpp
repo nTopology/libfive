@@ -390,7 +390,7 @@ void SimplexQEF<N>::checkVertConstraints()
 }
 
 template <unsigned N>
-typename SimplexQEF<N>::Vector 
+typename SimplexQEF<N>::Point 
 SimplexQEF<N>::solveRaw(unsigned cutoffLimit) const
 {
     // When the matrix rank is less than full so we have freedom in terms of
@@ -456,11 +456,11 @@ SimplexQEF<N>::solveRaw(unsigned cutoffLimit) const
 }
 
 template <>
-typename SimplexQEF<0>::Vector SimplexQEF<0>::solveRaw(unsigned) const
+typename SimplexQEF<0>::Point SimplexQEF<0>::solveRaw(unsigned) const
 {
     // There's no actual data here, we can just return a default-constructed
     // object.
-    return SimplexQEF<0>::Vector{};
+    return SimplexQEF<0>::Point{};
 }
 
 template class SimplexQEF<3>;

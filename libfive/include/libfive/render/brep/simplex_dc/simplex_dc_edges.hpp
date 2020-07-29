@@ -20,15 +20,15 @@ namespace libfive {
 // Forward declarations
 template <unsigned N, class Leaf> class SimplexTree;
 template <unsigned N> struct SimplexDCLeaf;
-template <unsigned N> struct SimplexDCMinEdge;
+template <unsigned N> struct SimplexDCEdge;
 template <unsigned N> struct SimplexDCIntersection;
 template <typename... T> class ObjectPool;
 
 /*  This dual-walker class simply allocates and assigns instances of the 
- *  SimplexDCMinEdge class to appropriate cells in the subtree.  We do this
+ *  SimplexDCEdge class to appropriate cells in the subtree.  We do this
  *  as a separate stage rather than as part of leaf construction in order
  *  to ensure that all cells bordering an edge will have the same 
- *  SimplexDCMinEdge struct (allowing us to later use this fact to ensure
+ *  SimplexDCEdge struct (allowing us to later use this fact to ensure
  *  we are making each simplex vertex exactly once and it will be accessible
  *  to all its edges).  (If we used the neighbors system, it would be likely
  *  but not certain that any given edge would have the same object for all its
@@ -52,7 +52,7 @@ public:
     };
     using Input = SimplexTree<N, SimplexDCLeaf<N>>;
 
-    using Pool = ObjectPool<SimplexDCMinEdge<N>, SimplexDCIntersection<N>>;
+    using Pool = ObjectPool<SimplexDCEdge<N>, SimplexDCIntersection<N>>;
 
 
     /*

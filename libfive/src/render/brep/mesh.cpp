@@ -197,7 +197,7 @@ std::unique_ptr<Mesh> Mesh::render(
         auto intersectionVerts = intersectionMap->buildVecs();
 
         // Get the vertices
-        auto vertsBRep = 
+        auto vertexerBRep = 
             Dual<3>::walk<SimplexDCVertexer<3>, size_t, const BRepSettings&>(
             t, settings, intersectionVerts.size() - 1/*Vert offset*/, settings);
 
@@ -225,7 +225,9 @@ std::unique_ptr<Mesh> Mesh::render(
         out->verts = std::move(intersectionVerts);
         assert(!vertsBRep->verts.empty());
         out->verts.insert(out->verts.end(), 
-            vertsBRep->verts.begin() + 1, vertsBRep->verts.end());
+            vertexerBRep->verts.begin() + 1, vertexerBRep->verts.end());
+        out->branes.insert(out->branes.end(),
+            vertexerBRep->branes.begin(), vertexerBRep->branes.end());
     }
 
     if (settings.progress_handler) {

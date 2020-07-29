@@ -19,6 +19,7 @@ SimplexDCIntersection<N>::SimplexDCIntersection()
 {
     /* No need to reset the Intersection; that was done by its default 
      * constructor. */
+    AtANormalized.array() = 0.0;
 }
 
 template<unsigned N>
@@ -28,6 +29,7 @@ void SimplexDCIntersection<N>::reset()
     refcount = 0;
     index.store(0);
     orientationChecker.reset();
+    AtANormalized.array() = 0.0;
     Intersection<N>::reset();
 }
 
@@ -78,13 +80,13 @@ DCSimplex<N>::insertIntersection(unsigned a,
 }
 
 template<unsigned N>
-SimplexDCMinEdge<N>::SimplexDCMinEdge()
+SimplexDCEdge<N>::SimplexDCEdge()
 {
     reset();
 }
 
 template<unsigned N>
-void SimplexDCMinEdge<N>::reset()
+void SimplexDCEdge<N>::reset()
 {
     for (auto& simplex : simplices) {
         std::fill(simplex.intersections.begin(),
@@ -97,7 +99,7 @@ void SimplexDCMinEdge<N>::reset()
 }
 
 template<unsigned N>
-void SimplexDCMinEdge<N>::releaseTo(Pool& object_pool)
+void SimplexDCEdge<N>::releaseTo(Pool& object_pool)
 {
     for (auto& simplex : simplices) {
         for (auto& i : simplex.intersections) {
@@ -115,25 +117,6 @@ void SimplexDCMinEdge<N>::releaseTo(Pool& object_pool)
     object_pool.put(this);
 }
 
-template<unsigned N>
-inline void SimplexDCMinEdge<N>::EdgeVec::push_back(SimplexDCMinEdge* ptr)
-{
-    std::unique_lock lock(mut);
-    vec.push_back(ptr);
-}
-
-template<unsigned N>
-inline void SimplexDCMinEdge<N>::EdgeVec::sort()
-{
-    std::unique_lock lock(mut);
-    if (isSorted) {
-        return;
-    }
-    std::sort(vec.begin(), vec.end(), 
-        [](auto a, auto b) {return a->lowPt < b->lowPt; });
-    isSorted = true;
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 
 template<unsigned N>
@@ -149,7 +132,7 @@ void SimplexDCLeaf<N>::reset()
     tape.reset();
     std::fill(sub.begin(), sub.end(), nullptr);
     for (auto& edge : edges) {
-        edge.template emplace<typename SimplexDCMinEdge<N>::EdgeVec>();
+        edge = nullptr;
     }
 }
 
@@ -164,16 +147,8 @@ void SimplexDCLeaf<N>::releaseTo(Pool& object_pool)
         s = nullptr;
     }
     for (auto& edge : edges) {
-        if (std::holds_alternative<SimplexDCMinEdge<N>*>(edge)) {
-            auto& minEdge = std::get<SimplexDCMinEdge<N>*>(edge);
-            if (--minEdge->refcount == 0) {
-                minEdge->releaseTo(object_pool.next().next());
-            }
-        }
-        else {
-            // Clear any vector or stack to free memory, by turning it
-            // into the pointer version.
-            edge.template emplace<SimplexDCMinEdge<N>*>(nullptr);
+        if (edge && --edge->refcount == 0) {
+            edge->releaseTo(object_pool.next().next());
         }
     }
     object_pool.put(this);

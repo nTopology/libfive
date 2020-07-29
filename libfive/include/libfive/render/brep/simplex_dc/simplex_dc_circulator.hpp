@@ -139,10 +139,9 @@ protected:
         }
         const auto& edge = edgeCell->leaf->edgeFromReduced(
             edgeAxis, edgeRelativePos);
-        assert(std::holds_alternative<SimplexDCMinEdge<3>*>(edge));
-        return &std::get<SimplexDCMinEdge<3>*>(edge)->
-            simplexWithEdgeReducedCell(
-                edgeAxis, faceAxis, relativeCellPos, cornerPos);
+        assert(std::holds_alternative<SimplexDCEdge<3>*>(edge));
+        return &edge->simplexWithEdgeReducedCell(
+            edgeAxis, faceAxis, relativeCellPos, cornerPos);
     }
 
     /*  Gets the K-dimensional subspace associated with this simplex.*/

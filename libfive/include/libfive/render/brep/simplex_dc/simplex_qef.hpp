@@ -140,7 +140,7 @@ protected:
      *  fits all remaining constraints will be our solution, because QEFs 
      *  on convex polytopes are nice like that.
      */
-    Vector solveRaw(unsigned cutoffLimit) const;
+    Point solveRaw(unsigned cutoffLimit) const;
 
     Point massPoint() const 
     { return mass_point.template head<N>() / mass_point[N]; }

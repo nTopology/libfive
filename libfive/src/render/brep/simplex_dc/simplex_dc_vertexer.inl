@@ -23,11 +23,7 @@ void SimplexDCVertexer<N>::load(const std::array<Input*, 1 << (N - 1)> & ts)
         [](const Input* a, const Input* b)
     { return a->leafLevel() < b->leafLevel(); }) - ts.begin();
 
-    auto& edgeVariant = ts[index]->leaf->
-                        edgeFromReduced(A, ts.size() - 1 - index);
-    assert(std::holds_alternative<SimplexDCMinEdge<N>*>(edgeVariant));
-
-    auto& edge = *std::get<SimplexDCMinEdge<N>*>(edgeVariant);
+    auto& edge = ts[index]->leaf->edgeFromReduced(A, ts.size() - 1 - index);
 
     // Calculate the subspace for the edge.
     std::array<int, 3> reductions{ 0, 0, 0 };
@@ -114,7 +110,7 @@ void SimplexDCVertexer<N>::load(const std::array<Input*, 1 << (N - 1)> & ts)
                     // Degenerate simplices do not get vertices.
                     continue;
                 }
-                auto& simplex = edge.simplexWithEdgeReducedCell(
+                auto& simplex = edge->simplexWithEdgeReducedCell(
                     A, faceAxis, cellIdx, corner);
                 assert(simplex.intersectionCount() == 3 ||
                     simplex.intersectionCount() == 4 ||
@@ -127,7 +123,11 @@ void SimplexDCVertexer<N>::load(const std::array<Input*, 1 << (N - 1)> & ts)
                         return { cornerSub, edgeSub, cellSub };
                     }
                 };
-                calcAndStoreVert(simplex, getVerts());
+                auto directionOrientation =
+                    (corner == 1) == (cellIdx == 0 || cellIdx == 3) == (N == 2);
+                auto axisOrientation = (N == 2) || (faceAxisIdx == 1);
+                calcAndStoreVert(simplex, getVerts(), 
+                                 directionOrientation == axisOrientation);
             }
         }
     }
@@ -135,21 +135,20 @@ void SimplexDCVertexer<N>::load(const std::array<Input*, 1 << (N - 1)> & ts)
 
 template<unsigned N>
 void SimplexDCVertexer<N>::calcAndStoreVert(
-    DCSimplex<N>& simplex, SubspaceVertArray vertsFromSubspaces)
+    DCSimplex<N>& simplex, 
+    SubspaceVertArray vertsFromSubspaces, 
+    bool orientation)
 {
     Eigen::Matrix<double, N, N + 1> vertices;
-    auto state = 0; // Bit 1 for inside, bit 2 for empty.
+    auto state = 0; // Bit 1 << N for bit N being inside.
     for (auto i = 0; i <= N; ++i) {
         if (vertsFromSubspaces[i]->inside) {
-            state |= 1;
-        }
-        else {
-            state |= 2;
+            state |= (1 << i);
         }
         vertices.col(i) = vertsFromSubspaces[i]->vert;
     }
-    if (state != 3) {
-        assert(state == 1 || state == 2);
+    if (state == 0 || state == (1 << (N + 1)) - 1) {
+        assert(simplifiedState == 1 || simplifiedState == 2);
         assert(simplex.intersectionCount() == 0);
         return; // No point in making a vertex if the simplex is all
                 // filled or all empty.
@@ -168,10 +167,188 @@ void SimplexDCVertexer<N>::calcAndStoreVert(
             }
         }
     }
-    simplex.vert = qef.solve();
-    assert(simplex.index == 0);
-    simplex.index = m.pushVertex(simplex.vert) + offset;
+    auto vertex = qef.solve();
+    auto AtANormalized = Eigen::Matrix<double, N, N>::Zero().eval();
+    for (const auto& intersection : simplex.intersections) {
+        if (DCSimplex<N>::isValid(intersection.load())) {
+            AtANormalized += intersection.load()->AtANormalized;
+        }
+    }
+    auto rank = 0;
+    Eigen::SelfAdjointEigenSolver<Eigen::Matrix<double, N, N>>
+        es(AtANormalized);
+    auto eigenvalues = es.eigenvalues().real();
+    for (unsigned j = 0; j < N; ++j) {
+        rank += (fabs(eigenvalues[j]) >= EIGENVALUE_CUTOFF);
+    }
+    const SimplexDCIntersection<N>* matching = nullptr;
+    bool found = false;
+    for (const auto& intersection : simplex.intersections) {
+        if (DCSimplex<N>::isValid(intersection.load()) && 
+            intersection.load()->get_rank() >= rank) {
+            found = true;
+            if (matching) {
+                matching = nullptr;
+                break;
+            }
+            else {
+                matching = intersection.load();
+            }
+        }
+    }
+    if (matching) {
+        simplex.index.store(matching->index);
+        simplex.vert = matching->normalized_mass_point().template head<N>();
+    }
+    else if (!found) {
+        simplex.vert = vertex;
+        assert(simplex.index == 0);
+        simplex.index = m.pushVertex(simplex.vert) + offset;
+    }
+    else if constexpr (N == 3) {
+        assert(simplex.index == 0);
+        switch (state) {
+        case 7:
+        case 11:
+        case 13:
+        case 14:
+            // This is the same as its complement state with the opposite
+            // orientation.
+            orientation = !orientation;
+            state = 15 - state;
+            // fallthrough
+        case 1:
+        case 2:
+        case 4:
+        case 8:
+            // There is exactly one corner different than the others,
+            // so we will be making one triangle.
+            {
+                std::array<std::pair<int, int>, 3> indices;
+                switch (state) {
+                case 1:
+                    indices = { std::pair{0, 1}, {0, 2}, {0, 3} };
+                    break;
+                case 2:
+                    indices = { std::pair{1, 0}, {1, 3}, {1, 2} };
+                    break;
+                case 4:
+                    indices = { std::pair{2, 0}, {2, 1}, {2, 3} };
+                    break;
+                case 8:
+                    indices = { std::pair{3, 0}, {3, 2}, {3, 1} };
+                    break;
+                default:
+                    assert(false);
+                    return;
+                }
+                if (!orientation) {
+                    std::swap(indices[1], indices[2]);
+                }
+                Eigen::Matrix<uint32_t, 3, 1> triangle;
+                for (auto i = 0; i < 3; ++i) {
+                    auto intersection = simplex.intersection(
+                        indices[i].first, indices[i].second);
+                    assert(DCSimplex<N>::isValid(intersection));
+                    assert(intersection->index != 0);
+                    triangle[i] = intersection->index;
+                }
+                m.branes.push_back(triangle);
+            }
+            break;
+        case 9:
+        case 10:
+        case 12:
+            // Again, reduce cases by flipping orientation.
+            orientation = !orientation;
+            state = 15 - state;
+            // fallthrough
+        case 3:
+        case 5:
+        case 6:
+            // The corner states split 2 and 2, so we will be making two
+            // different triangles. 
+            {
+                std::array<std::pair<int, int>, 4> indices;
+                switch (state) {
+                case 3:
+                    indices = { std::pair{0, 2}, {0, 3}, {1, 3}, {1, 2} };
+                    break;
+                case 5:
+                    indices = { std::pair{0, 1}, {2, 1}, {2, 3}, {0, 3} };
+                    break;
+                case 6:
+                    indices = { std::pair{0, 1}, {3, 1}, {3, 2}, {0, 2} };
+                    break;
+                default:
+                    assert(false);
+                    return;
+                }
+                if (!orientation) {
+                    std::swap(indices[1], indices[3]);
+                }
+                std::array<const SimplexDCIntersection<N>*, 4> intersections;
+                for (auto i = 0; i < 4; ++i) {
+                    auto intersection = simplex.intersection(
+                        indices[i].first, indices[i].second);
+                    assert(DCSimplex<N>::isValid(intersection));
+                    assert(intersection->index != 0);
+                    intersections[i] = intersection;
+                }
+                // Now to determine whether to do {0, 1, 3} and {2, 3, 1}, or
+                // {1, 2, 0} and {3, 0, 2}
+                auto double1And3 = false;
+                std::array<int, 2> ranks02{ intersections[0]->get_rank(), 
+                                            intersections[2]->get_rank() };
+                // Sort it in reverse order, so that the higher rank is first.
+                std::sort(ranks02.rbegin(), ranks02.rend()); 
+                std::array<int, 2> ranks13{ intersections[1]->get_rank(),
+                                            intersections[3]->get_rank() };
+                std::sort(ranks13.rbegin(), ranks13.rend());
+                if (ranks02 < ranks13) {
+                    // We want to double the higher-rank pair (prioritizing the
+                    // highest rank), to better match sharp features.
+                    double1And3 = true;
+                }
+                else if (ranks02 == ranks13) {
+                    // We have a tie, so go on to the next approach:
+                    auto getPt = [&](int i) {
+                        return intersections[i]->normalized_mass_point()
+                            .template head<3>().eval();
+                    };
+                    auto distanceSq02 = (getPt(0) - getPt(2)).squaredNorm();
+                    auto distanceSq13 = (getPt(1) - getPt(3)).squaredNorm();
+                    // Use the approach that minimizes the distance between
+                    // the two doubled points, as that should minimize the
+                    // folding over due to the triangulation.
+                    double1And3 = distanceSq13 < distanceSq02;
+                }
+                auto getIdx = [&](int index) {
+                    return intersections[index]->index.load();
+                };
+                Eigen::Matrix<uint32_t, 3, 1> triangle;
+                if (double1And3) {
+                    triangle << getIdx(0), getIdx(1), getIdx(3);
+                    m.branes.push_back(triangle);
+                    triangle << getIdx(2), getIdx(3), getIdx(1);
+                    m.branes.push_back(triangle);
+                }
+                else {
+                    triangle << getIdx(1), getIdx(2), getIdx(0);
+                    m.branes.push_back(triangle);
+                    triangle << getIdx(3), getIdx(0), getIdx(2);
+                    m.branes.push_back(triangle);
+                }
+            }
+            break;
+        default:
+            assert(false);
+        }
+    }
+    else {
+        static_assert(N == 2);
+        // TBD.
+    }
 }
-
 
 }   // namespace libfive

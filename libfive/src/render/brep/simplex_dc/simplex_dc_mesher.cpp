@@ -251,7 +251,7 @@ void SimplexDCMesher::load(const std::array<Input*, 8>& ts) {
     const auto& cornerSub = *ts[index]->leaf->collapsedSub(cornerSubspaceIndex);
     constexpr std::array tsIndices{ 0, 1, 2, 3, 4, 5, 6, 7 };
 
-    std::array<SimplexDCMinEdge<3>*, 6> edges;
+    std::array<SimplexDCEdge<3>*, 6> edges;
 
     // Handle edges between edge vertices and our corner vertex.
     for (auto edgeAxisIdx = 0; edgeAxisIdx < 3; ++edgeAxisIdx) {
@@ -289,10 +289,7 @@ void SimplexDCMesher::load(const std::array<Input*, 8>& ts) {
                 continue;
             }
             auto lowerCorner = ~edgeIndex & ~edgeAxis & 7;
-            const auto& edgeVariant =
-                ts[edgeIndex]->leaf->edge(edgeAxis, lowerCorner);
-            assert(std::holds_alternative<SimplexDCMinEdge<3>*>(edgeVariant));
-            const auto& edge = std::get<SimplexDCMinEdge<3>*>(edgeVariant);
+            const auto& edge = ts[edgeIndex]->leaf->edge(edgeAxis, lowerCorner);
             edges[edgeAxisIdx * 2 + edgePosition] = edge;
             auto edgeSubIndex = CornerIndex(lowerCorner).neighbor().i + 
                 2 * ipow(3, Axis::toIndex(edgeAxis));
@@ -500,6 +497,13 @@ void SimplexDCMesher::addPolygon(SimplexDCCirculator<3, true> circulator)
         Eigen::Matrix<uint32_t, 3, 1> triangle;
         auto vert1 = circulator.simplex()->vert;
         auto index1 = getIndex(circulator.simplex());
+        if (index1 == 0) {
+            // The simplex has no vertex; instead, we're using the
+            // triangle(s) that was/were created for the simplex by the vertexer
+            // instead of giving it a vertex.
+            ++circulator;
+            continue;
+        }
         // There is a second intersection shared between the two simplices
         // we are currently connecting, and we may need it to handle the
         // possibility that the line between two simplex vertices may pass
@@ -508,11 +512,11 @@ void SimplexDCMesher::addPolygon(SimplexDCCirculator<3, true> circulator)
         assert(otherIntersection != nullptr);
         assert(otherIntersection != intersection);
         if (otherIntersection->index == intersection->index) {
-            // This happens if both are at their shared corner
-            // (up to float precision).  In that case, the triangle this would
-            // produce and the one that would be produced for this simplex and
-            // a circulator around otherIntersection are flipped versions of
-            // each other, so we simply remove (do not create) both of them.
+            // This happens if the two intersections collapse to each other.
+            // In that case, the triangle this would produce and the one that
+            // would be produced for this simplex and a circulator around 
+            // otherIntersection are flipped versions of each other, so we 
+            // simply remove (do not create) both of them.
             ++circulator;
             continue;
         }
@@ -521,6 +525,18 @@ void SimplexDCMesher::addPolygon(SimplexDCCirculator<3, true> circulator)
         assert(otherIntersection == circulator.passingIntersection(false));
         auto vert2 = circulator.simplex()->vert;
         auto index2 = getIndex(circulator.simplex());
+        if (index2 == 0) {
+            // In this case, one of our simplices has a vertex and the other
+            // does not, so we want one of the two triangles that would use
+            // this pair to use the simplex's triangle and the other to connect
+            // the two intersection vertices (which are two points of said 
+            // triangle) to the existing simplex intersection.  The simplex
+            // triangle is being used when we circulate around otherIntersection
+            // (as our index2 is its index1), so in this case we do:
+            triangle << index1, otherIntersection->index, intersection->index;
+            m.branes.push_back(triangle);
+            continue;
+        }
         auto goodForThis = intersection->orientationChecker.check(
             vert1, vert2, intersectionVert);
         auto goodForOther = otherIntersection->orientationChecker.check(
@@ -531,9 +547,15 @@ void SimplexDCMesher::addPolygon(SimplexDCCirculator<3, true> circulator)
             // The usual case, the orientations of the simplices and their 
             // vertices are the same throughout.  Equivalently, the line 
             // between the vertices of our two simplices goes through the 
-            // triangle between those simplices.
-            triangle << intersection->index, index1, index2;
-            m.branes.push_back(triangle);
+            // triangle between those simplices.  We thus create one triangle,
+            // unless one of the simplices collapsed to this intersection or
+            // they both collapsed to the same intersection.
+            if (intersection->index != index1 && 
+                intersection->index != index2 &&
+                index1 != index2) {
+                triangle << intersection->index, index1, index2;
+                m.branes.push_back(triangle);
+            }
             break;
         case 2:
             // The line between the vertices of our simplices goes past the
@@ -576,12 +598,22 @@ void SimplexDCMesher::addPolygon(SimplexDCCirculator<3, true> circulator)
             // ignored (not made) by the corresponding case 2, so they cancel
             // out and we make neither.  The other two are between both 
             // intersection vertices and each of the simplex vertices.
-            triangle << index2, intersection->index, otherIntersection->index;
-            m.branes.push_back(triangle);
 
-            triangle << index1, otherIntersection->index, intersection->index;
+            if (intersection->index != otherIntersection->index &&
+                intersection->index != index2 &&
+                otherIntersection->index != index2) {
+                triangle << 
+                    index2, intersection->index, otherIntersection->index;
+                m.branes.push_back(triangle);
+            }
 
-            m.branes.push_back(triangle);
+            if (intersection->index != otherIntersection->index &&
+                intersection->index != index1 &&
+                otherIntersection->index != index1) {
+                triangle << 
+                    index1, otherIntersection->index, intersection->index;
+                m.branes.push_back(triangle);
+            }
         }
     }
 }

@@ -24,7 +24,7 @@ namespace libfive {
 template <unsigned N, class Leaf> class SimplexTree; 
 template <unsigned N> struct SimplexLeafSubspace;
 template <unsigned N> struct SimplexDCLeaf;
-template <unsigned N> struct SimplexDCMinEdge;
+template <unsigned N> struct SimplexDCEdge;
 template <unsigned N> struct SimplexDCIntersection;
 template <typename... T> class ObjectPool;
 class Evaluator;

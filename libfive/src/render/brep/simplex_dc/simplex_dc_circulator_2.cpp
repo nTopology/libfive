@@ -248,9 +248,7 @@ DCSimplex<2>* SimplexDCCirculator<2, true>::forwardSimplex(
             NeighborIndex(edgeIdx).floating());
         assert(edgeAxis == Axis::X || edgeAxis == Axis::Y);
         auto edgePos = NeighborIndex(edgeIdx).pos();
-        const auto& edgeVar = cell->leaf->edge(edgeAxis, edgePos);
-        assert(std::holds_alternative<SimplexDCMinEdge<2>*>(edgeVar));
-        const auto& edge = std::get<SimplexDCMinEdge<2>*>(edgeVar);
+        auto edge = cell->leaf->edge(edgeAxis, edgePos);
         bool isUpperCorner(NeighborIndex(cornerIdx).pos() & edgeAxis);
         bool isUpperCell(!edgePos);
         if (cellIdx != 8) {

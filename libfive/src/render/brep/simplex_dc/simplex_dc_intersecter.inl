@@ -373,7 +373,7 @@ void SimplexDCIntersecter<N>::load(const std::array<Input*, 1 << N>& ts)
         }
     }();
 
-    std::array<SimplexDCMinEdge<N>*, N * 2> edges;
+    std::array<SimplexDCEdge<N>*, N * 2> edges;
 
     // Handle edges between edge vertices and our corner vertex.
     for (auto edgeAxisIdx = 0; edgeAxisIdx < N; ++edgeAxisIdx) {
@@ -414,10 +414,7 @@ void SimplexDCIntersecter<N>::load(const std::array<Input*, 1 << N>& ts)
                 continue;
             }
             auto lowerCorner = ~edgeIndex & ~edgeAxis & ((1 << N) - 1);
-            const auto& edgeVariant = 
-                ts[edgeIndex]->leaf->edge(edgeAxis, lowerCorner);
-            assert(std::holds_alternative<SimplexDCMinEdge<N>*>(edgeVariant));
-            const auto& edge = std::get<SimplexDCMinEdge<N>*>(edgeVariant);
+            const auto& edge = ts[edgeIndex]->leaf->edge(edgeAxis, lowerCorner);
             edges[edgeAxisIdx * 2 + edgePosition] = edge;
             auto edgeSubIndex = CornerIndex(lowerCorner).neighbor().i + 
                 2 * ipow(3, Axis::toIndex(edgeAxis));
@@ -731,6 +728,7 @@ SimplexDCIntersection<N>* SimplexDCIntersecter<N>::searchEdge(
 
 
     auto intersection = my_pool.get();
+
     // Iterate over all inside-outside pairs, storing the number
     // of intersections before each inside node (in prev_size),
     // then checking the rank of the pair after each outside
@@ -750,12 +748,22 @@ SimplexDCIntersection<N>* SimplexDCIntersecter<N>::searchEdge(
         if (!std::isfinite(ds.col(i).w())) {
             continue;
         }
-        auto pushDeriv = [&pos, &ds, &intersection, i](auto deriv) {
+        auto pushDeriv = 
+            [&pos, &ds, &intersection, i](auto deriv) {
+
             if (std::isfinite(deriv.x()) && std::isfinite(deriv.y()) &&
                 std::isfinite(deriv.z())) {
+                Eigen::Matrix<double, N, 1> derivProper =
+                    deriv.template cast<double>().template head<N>();
             intersection->push(pos.template head<N>(), 
-                               deriv.template cast<double>().template head<N>(),
+                               derivProper,
                                ds.col(i).w());
+            auto norm = derivProper.norm();
+            if (norm > 1e-20) {
+                auto normalized = derivProper / norm;
+                intersection->AtANormalized +=
+                    normalized * normalized.transpose();
+            }
           }
         };
 
@@ -794,6 +802,15 @@ SimplexDCIntersection<N>* SimplexDCIntersecter<N>::searchEdge(
     m.insert(closeSub, pt, intersection);
 
     intersection->orientationChecker.setEndpts(outside->vert, inside->vert);
+
+    // Calculate the rank now, to avoid threading issues.
+    intersection->rank = 0;
+    Eigen::SelfAdjointEigenSolver<Eigen::Matrix<double, N, N>> 
+        es(intersection->AtANormalized);
+    auto eigenvalues = es.eigenvalues().real();
+    for (unsigned j = 0; j < N; ++j) {
+        intersection->rank += (fabs(eigenvalues[j]) >= EIGENVALUE_CUTOFF);
+    }
     return intersection;
 }
 
