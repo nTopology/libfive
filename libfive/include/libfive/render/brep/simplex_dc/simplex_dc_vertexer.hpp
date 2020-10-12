@@ -25,7 +25,7 @@ template <unsigned N> struct SimplexLeafSubspace;
 template <unsigned N> struct DCSimplex;
 struct BRepSettings;
 
-template <unsigned N>
+template <unsigned N, bool indexing>
 class SimplexDCVertexer
 {
 public:
@@ -34,12 +34,18 @@ public:
     // neither is the entirety of the mesh's vertices/branes.
     using Output = BRep<N>;
     using PerThreadOutput = PerThreadBRep<N>;
+
+    // This class has two different versions; one that calculates the vertex or
+    // collapse candidate and also uses BRepSettings, and one that assigns
+    // indices and thus needs a size_t for an index offset to account for the
+    // vertices already set for intersections.
+    using Data = std::conditional_t<indexing, size_t, const BRepSettings&>;
+
     /*
      *  Constructor.
      */
-    SimplexDCVertexer(PerThreadBRep<N>& m, size_t vertsOffset, 
-                      const BRepSettings& settings)
-        : m(m), offset(vertsOffset), settings(settings) {}
+    SimplexDCVertexer(PerThreadBRep<N>& m, Data data)
+        : m(m), data(data) {}
 
     /* 
      *  Empty cell loader, called by Dual::walk 
@@ -92,10 +98,7 @@ protected:
 
     PerThreadBRep<N>& m;
 
-    size_t offset; // Offset when storing vertices, since early vertex numbers
-                   // are taken by intersection vertices.
-
-    const BRepSettings& settings;
+    Data data;
 };
 
 ////////////////////////////////////////////////////////////////////////////////

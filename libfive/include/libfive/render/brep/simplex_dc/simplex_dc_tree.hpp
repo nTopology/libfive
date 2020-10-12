@@ -101,6 +101,11 @@ struct SimplexDCIntersection : Intersection<N>
      *  different scales.*/
     Eigen::Matrix<double, N, N> AtANormalized;
 
+    /*  Used when collapsing intersections, both for meshing purposes and to 
+     *  provide a "forwarding address" for simplices that collapse to this.
+     */
+    const SimplexDCIntersection* collapseTarget = nullptr;
+
     OrientationChecker<N> orientationChecker;
 };
 
@@ -149,6 +154,13 @@ struct DCSimplex
 
     /*  Global indices for simplex vertices  */
     std::atomic<uint64_t> index = 0;
+
+    /*  Used when collapsing to intersections, since we can't set the index
+     *  when we first determine we're collapsing to an intersection (we need
+     *  to do intersection collapsing after that but before setting indices).
+     */
+    const SimplexDCIntersection<N>* collapseTarget = nullptr;
+    bool hasVert = false;
 
     DEFAULT_OPERATORS_NEW_AND_DELETE
 };

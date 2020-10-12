@@ -197,9 +197,11 @@ std::unique_ptr<Mesh> Mesh::render(
         auto intersectionVerts = intersectionMap->buildVecs();
 
         // Get the vertices
+        Dual<3>::walk<SimplexDCVertexer<3, false>, const BRepSettings&>(
+                t, settings, settings);
         auto vertexerBRep = 
-            Dual<3>::walk<SimplexDCVertexer<3>, size_t, const BRepSettings&>(
-            t, settings, intersectionVerts.size() - 1/*Vert offset*/, settings);
+            Dual<3>::walk<SimplexDCVertexer<3, true>, size_t>(
+            t, settings, intersectionVerts.size() - 1/*Vert offset*/);
 
         if (settings.cancel.load()) {
             if (settings.progress_handler) {

@@ -15,9 +15,10 @@ You can obtain one at http://mozilla.org/MPL/2.0/.
 
 namespace libfive {
 
-template <unsigned N>
+template <unsigned N, bool indexing>
 template <Axis::Axis A>
-void SimplexDCVertexer<N>::load(const std::array<Input*, 1 << (N - 1)> & ts)
+void SimplexDCVertexer<N, indexing>::load(
+    const std::array<Input*, 1 << (N - 1)> & ts)
 {
     const auto index = std::min_element(ts.begin(), ts.end(),
         [](const Input* a, const Input* b)
@@ -73,7 +74,8 @@ void SimplexDCVertexer<N>::load(const std::array<Input*, 1 << (N - 1)> & ts)
             bool isUpperToFace(bestCellIdx & (i & 2 ? 2 : 1));
             auto faceSubspaceIndex = 
                 26 - ipow(3, Axis::toIndex(faceAxis)) * (isUpperToFace + 1);
-            faceSubs[i] = ts[bestCellIdx]->leaf->collapsedSub(faceSubspaceIndex);
+            faceSubs[i] = 
+                ts[bestCellIdx]->leaf->collapsedSub(faceSubspaceIndex);
         }
     }
 
@@ -115,6 +117,10 @@ void SimplexDCVertexer<N>::load(const std::array<Input*, 1 << (N - 1)> & ts)
                 assert(simplex.intersectionCount() == 3 ||
                     simplex.intersectionCount() == 4 ||
                     simplex.intersectionCount() == 0);
+                // We actually only need getVerts() for the non-indexing version
+                // and only need orientation for the indexing version, but 
+                // they'll likely be optimized away anyway in the versions where
+                // they're not used.
                 auto getVerts = [&]()->SubspaceVertArray {
                     if constexpr (N == 3) {
                         return { cornerSub, edgeSub, faceSub, cellSub };
@@ -133,8 +139,8 @@ void SimplexDCVertexer<N>::load(const std::array<Input*, 1 << (N - 1)> & ts)
     }
 }
 
-template<unsigned N>
-void SimplexDCVertexer<N>::calcAndStoreVert(
+template<unsigned N, bool indexing>
+void SimplexDCVertexer<N, indexing>::calcAndStoreVert(
     DCSimplex<N>& simplex, 
     SubspaceVertArray vertsFromSubspaces, 
     bool orientation)
@@ -147,82 +153,95 @@ void SimplexDCVertexer<N>::calcAndStoreVert(
         }
         vertices.col(i) = vertsFromSubspaces[i]->vert;
     }
-    if (state == 0 || state == (1 << (N + 1)) - 1) {
-        assert(simplifiedState == 1 || simplifiedState == 2);
-        assert(simplex.intersectionCount() == 0);
-        return; // No point in making a vertex if the simplex is all
-                // filled or all empty.
-    }
+    if constexpr (!indexing) {
+        const auto& settings = data;
+        if (state == 0 || state == (1 << (N + 1)) - 1) {
+            assert(simplifiedState == 1 || simplifiedState == 2);
+            assert(simplex.intersectionCount() == 0);
+            return; // No point in making a vertex if the simplex is all
+                    // filled or all empty.
+        }
 
-    SimplexQEF<N> qef(std::move(vertices), 
-                      settings.simplex_dc_padding_rate, 
-                      settings.simplex_bounding_eigenvalue_cutoff);
+        SimplexQEF<N> qef(std::move(vertices),
+                          settings.simplex_dc_padding_rate,
+                          settings.simplex_bounding_eigenvalue_cutoff);
 
-    for (auto a = 0; a < N; ++a) {
-        for (auto b = a + 1; b <= N; ++b) {
-            auto intersection = simplex.intersection(a, b);
-            assert(intersection != &DCSimplex<N>::dupVertIntersection);
-            if (intersection != nullptr) {
-                qef += *intersection;
+        for (auto a = 0; a < N; ++a) {
+            for (auto b = a + 1; b <= N; ++b) {
+                auto intersection = simplex.intersection(a, b);
+                assert(intersection != &DCSimplex<N>::dupVertIntersection);
+                if (intersection != nullptr) {
+                    qef += *intersection;
+                }
             }
         }
-    }
-    auto vertex = qef.solve();
-    auto AtANormalized = Eigen::Matrix<double, N, N>::Zero().eval();
-    for (const auto& intersection : simplex.intersections) {
-        if (DCSimplex<N>::isValid(intersection.load())) {
-            AtANormalized += intersection.load()->AtANormalized;
-        }
-    }
-    auto rank = 0;
-    Eigen::SelfAdjointEigenSolver<Eigen::Matrix<double, N, N>>
-        es(AtANormalized);
-    auto eigenvalues = es.eigenvalues().real();
-    for (unsigned j = 0; j < N; ++j) {
-        rank += (fabs(eigenvalues[j]) >= EIGENVALUE_CUTOFF);
-    }
-    const SimplexDCIntersection<N>* matching = nullptr;
-    bool found = false;
-    for (const auto& intersection : simplex.intersections) {
-        if (DCSimplex<N>::isValid(intersection.load()) && 
-            intersection.load()->get_rank() >= rank) {
-            found = true;
-            if (matching) {
-                matching = nullptr;
-                break;
-            }
-            else {
-                matching = intersection.load();
+        auto vertex = qef.solve();
+        auto AtANormalized = Eigen::Matrix<double, N, N>::Zero().eval();
+        for (const auto& intersection : simplex.intersections) {
+            if (DCSimplex<N>::isValid(intersection.load())) {
+                AtANormalized += intersection.load()->AtANormalized;
             }
         }
+        auto rank = 0;
+        Eigen::SelfAdjointEigenSolver<Eigen::Matrix<double, N, N>>
+            es(AtANormalized);
+        auto eigenvalues = es.eigenvalues().real();
+        for (unsigned j = 0; j < N; ++j) {
+            rank += (fabs(eigenvalues[j]) >= EIGENVALUE_CUTOFF);
+        }
+        assert(simplex.collapseTarget == nullptr);
+        assert(simplex.hasVert == false);
+        simplex.hasVert = true;
+        for (const auto& intersection : simplex.intersections) {
+            if (DCSimplex<N>::isValid(intersection.load()) &&
+                intersection.load()->get_rank() >= rank) {
+                if (simplex.collapseTarget) {
+                    simplex.collapseTarget = nullptr;
+                    break;
+                }
+                else {
+                    simplex.hasVert = false;
+                    simplex.collapseTarget = intersection.load();
+                }
+            }
+        }
+        if (simplex.hasVert) {
+            simplex.vert = vertex;
+        }
     }
-    if (matching) {
-        simplex.index.store(matching->index);
-        simplex.vert = matching->normalized_mass_point().template head<N>();
-    }
-    else if (!found) {
-        simplex.vert = vertex;
-        assert(simplex.index == 0);
-        simplex.index = m.pushVertex(simplex.vert) + offset;
-    }
-    else if constexpr (N == 3) {
-        assert(simplex.index == 0);
-        switch (state) {
-        case 7:
-        case 11:
-        case 13:
-        case 14:
-            // This is the same as its complement state with the opposite
-            // orientation.
-            orientation = !orientation;
-            state = 15 - state;
-            // fallthrough
-        case 1:
-        case 2:
-        case 4:
-        case 8:
-            // There is exactly one corner different than the others,
-            // so we will be making one triangle.
+    else {
+        // Indexing version.
+        if (simplex.collapseTarget) {
+            while (simplex.collapseTarget->collapseTarget != nullptr) {
+                simplex.collapseTarget = simplex.collapseTarget->collapseTarget;
+            }
+            simplex.index.store(simplex.collapseTarget->index);
+            simplex.vert = simplex.collapseTarget->
+                normalized_mass_point().template head<N>();
+        }
+        else if (simplex.hasVert) {
+            auto offset = data;
+            assert(simplex.index == 0);
+            simplex.index = m.pushVertex(simplex.vert) + offset;
+        }
+        else if constexpr (N == 3) {
+            assert(simplex.index == 0);
+            switch (state) {
+            case 7:
+            case 11:
+            case 13:
+            case 14:
+                // This is the same as its complement state with the opposite
+                // orientation.
+                orientation = !orientation;
+                state = 15 - state;
+                // fallthrough
+            case 1:
+            case 2:
+            case 4:
+            case 8:
+                // There is exactly one corner different than the others,
+                // so we will be making one triangle.
             {
                 std::array<std::pair<int, int>, 3> indices;
                 switch (state) {
@@ -256,18 +275,18 @@ void SimplexDCVertexer<N>::calcAndStoreVert(
                 m.branes.push_back(triangle);
             }
             break;
-        case 9:
-        case 10:
-        case 12:
-            // Again, reduce cases by flipping orientation.
-            orientation = !orientation;
-            state = 15 - state;
-            // fallthrough
-        case 3:
-        case 5:
-        case 6:
-            // The corner states split 2 and 2, so we will be making two
-            // different triangles. 
+            case 9:
+            case 10:
+            case 12:
+                // Again, reduce cases by flipping orientation.
+                orientation = !orientation;
+                state = 15 - state;
+                // fallthrough
+            case 3:
+            case 5:
+            case 6:
+                // The corner states split 2 and 2, so we will be making two
+                // different triangles. 
             {
                 std::array<std::pair<int, int>, 4> indices;
                 switch (state) {
@@ -298,10 +317,10 @@ void SimplexDCVertexer<N>::calcAndStoreVert(
                 // Now to determine whether to do {0, 1, 3} and {2, 3, 1}, or
                 // {1, 2, 0} and {3, 0, 2}
                 auto double1And3 = false;
-                std::array<int, 2> ranks02{ intersections[0]->get_rank(), 
+                std::array<int, 2> ranks02{ intersections[0]->get_rank(),
                                             intersections[2]->get_rank() };
                 // Sort it in reverse order, so that the higher rank is first.
-                std::sort(ranks02.rbegin(), ranks02.rend()); 
+                std::sort(ranks02.rbegin(), ranks02.rend());
                 std::array<int, 2> ranks13{ intersections[1]->get_rank(),
                                             intersections[3]->get_rank() };
                 std::sort(ranks13.rbegin(), ranks13.rend());
@@ -341,13 +360,14 @@ void SimplexDCVertexer<N>::calcAndStoreVert(
                 }
             }
             break;
-        default:
-            assert(false);
+            default:
+                assert(false);
+            }
         }
-    }
-    else {
-        static_assert(N == 2);
-        // TBD.
+        else {
+            static_assert(N == 2);
+            // TBD.
+        }
     }
 }
 

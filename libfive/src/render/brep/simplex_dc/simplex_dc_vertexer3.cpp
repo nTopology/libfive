@@ -10,12 +10,20 @@ You can obtain one at http://mozilla.org/MPL/2.0/.
 #include "simplex_dc_vertexer.inl"
 
 namespace libfive {
-template class SimplexDCVertexer<3>;
+template class SimplexDCVertexer<3, false>;
+template class SimplexDCVertexer<3, true>;
 
-template void SimplexDCVertexer<3>::load<Axis::X>(
+
+template void SimplexDCVertexer<3, false>::load<Axis::X>(
     const std::array<Input*, 4>&);
-template void SimplexDCVertexer<3>::load<Axis::Y>(
+template void SimplexDCVertexer<3, false>::load<Axis::Y>(
     const std::array<Input*, 4>&);
-template void SimplexDCVertexer<3>::load<Axis::Z>(
+template void SimplexDCVertexer<3, false>::load<Axis::Z>(
+    const std::array<Input*, 4>&);
+template void SimplexDCVertexer<3, true>::load<Axis::X>(
+    const std::array<Input*, 4>&);
+template void SimplexDCVertexer<3, true>::load<Axis::Y>(
+    const std::array<Input*, 4>&);
+template void SimplexDCVertexer<3, true>::load<Axis::Z>(
     const std::array<Input*, 4>&);
 }   // namespace libfive
