@@ -588,12 +588,13 @@ void DCTree<N>::collectChildren(Evaluator* eval,
     for (unsigned i=0; i < this->children.size(); ++i)
     {
         cs[i] = this->children[i].load(std::memory_order_relaxed);
+        assert(cs[i] != nullptr);
     }
 
     // If any children are branches, then we can't collapse.
     // We do this check first, to avoid allocating then freeing a Leaf
     if (std::any_of(cs.begin(), cs.end(),
-                    [](DCTree<N>* o){ return o->isBranch(); }))
+                    [](DCTree<N>* o){ return o && o->isBranch(); }))
     {
         this->done();
         return;
