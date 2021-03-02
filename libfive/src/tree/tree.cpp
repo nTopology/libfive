@@ -89,11 +89,9 @@ Tree::Tree(Opcode::Opcode op, Tree a, Tree b)
     }
 }
 
-Tree Tree::var(const std::any& ud)
+Tree Tree::var()
 {
-    auto v = Cache::instance()->var();
-    v->userData = ud;
-    return Tree(v);
+  return Tree(Cache::instance()->var());
 }
 
 Tree::~Tree()
