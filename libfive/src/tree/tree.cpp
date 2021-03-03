@@ -91,7 +91,7 @@ Tree::Tree(Opcode::Opcode op, Tree a, Tree b)
 
 Tree Tree::var()
 {
-  return Tree(Cache::instance()->var());
+    return Tree(Cache::instance()->var());
 }
 
 Tree::~Tree()
