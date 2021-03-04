@@ -117,7 +117,7 @@ public:
     /*
      *  Returns a new unique variable
      */
-    static Tree var();
+    static Tree var(const std::any& ud = {});
 
     /*
      *  Destructor to ensure thread-safety while manipulating the Cache
@@ -203,7 +203,6 @@ public:
     Tree rhs() const;
 
     std::any* getUserData() const { return (ptr ? &(ptr->userData): nullptr); }
-    void setUserData(const std::any& ud) const { if (ptr) { ptr->userData = ud; } }
 
 protected:
     /*
