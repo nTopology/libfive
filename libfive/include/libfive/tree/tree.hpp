@@ -165,7 +165,7 @@ public:
     /*
      *  Executes an arbitrary remapping
      */
-    Tree remap(std::map<Id, Tree> m) const;
+    Tree remap(std::map<Id, Tree> m, bool includeOracleDeps = false) const;
 
     /*
      *  Returns a tree in which all VAR clauses are wrapped in a

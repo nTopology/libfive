@@ -227,7 +227,7 @@ Tree Tree::remap(Tree X_, Tree Y_, Tree Z_) const
     return remap(m);
 }
 
-Tree Tree::remap(std::map<Id, Tree> m) const
+Tree Tree::remap(std::map<Id, Tree> m, bool includeOracleDeps /* = false */) const
 {
     // Oracles only care about remapping X/Y/Z, so we extract them here.
     auto get_remapped = [&](Tree target) {
@@ -238,7 +238,7 @@ Tree Tree::remap(std::map<Id, Tree> m) const
     auto Y_ = get_remapped(Tree::Y());
     auto Z_ = get_remapped(Tree::Z());
 
-    for (const auto& t : ordered())
+    for (const auto& t : ordered(includeOracleDeps))
     {
         if (Opcode::args(t->op) >= 1)
         {
