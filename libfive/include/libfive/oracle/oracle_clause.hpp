@@ -54,7 +54,19 @@ public:
     {
         return {};
     }
+
     unsigned rank() const;
+
+    virtual std::unique_ptr<OracleClause> clone() const = 0;
+
+    /*
+     * Returns the absolute value of the oracle.
+     * This can used to improve performance on certain oracles.
+     */
+    virtual libfive::Tree abs() const {
+      Tree tree(clone());
+      return Tree(Opcode::OP_ABS, std::move(tree));
+    }
 
     /*
      *  Installs a particular class's serializer / deserializer pair
