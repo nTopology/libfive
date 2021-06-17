@@ -39,6 +39,10 @@ public:
         }
         return std::unique_ptr<const OracleClause>(new ST());
     }
+
+    std::unique_ptr<OracleClause> clone() const override {
+        return std::make_unique<ST>(*this);
+    }
 };
 REGISTER_ORACLE_CLAUSE(ST)
 

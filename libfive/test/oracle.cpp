@@ -170,6 +170,12 @@ public:
     {
         return "PickySIMDOracle";
     }
+
+    std::unique_ptr<OracleClause> clone() const override
+    {
+        return std::make_unique<PickySIMDOracleClause>(*this);
+    }
+
     long& expected_eval_size;
 };
 

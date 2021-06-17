@@ -30,9 +30,13 @@ public:
           std::unordered_map<Tree::Id, Clause::Id> map) const override;
     std::string name() const override { return "TransformedOracleClause"; }
 
-    /*
-     *  More efficient remap implementation that remaps the underlying Trees
-     */
+    std::unique_ptr<OracleClause> clone() const override {
+        return std::make_unique<TransformedOracleClause>(*this);
+    }
+
+  /*
+   *  More efficient remap implementation that remaps the underlying Trees
+   */
     std::unique_ptr<const OracleClause> remap(
             Tree self, Tree X_, Tree Y_, Tree Z_) const override;
 
