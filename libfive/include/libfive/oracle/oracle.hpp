@@ -184,10 +184,8 @@ public:
         this->evaluator = nullptr;
     }
 
-    virtual bool isSigned() { return true; }
-
 protected:
-  std::shared_ptr<OracleContext> context;
+    std::shared_ptr<OracleContext> context;
     const BaseEvaluator*           evaluator;
 };
 
