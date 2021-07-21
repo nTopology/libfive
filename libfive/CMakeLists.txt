@@ -3,7 +3,7 @@ if (NOT DEFINED LIBFIVE_BUILD_FROM_ROOT)
     message(FATAL_ERROR "CMake must be called against top-level directory")
 endif()
 
-option(BUILD_TESTS "Build test suite" ON)
+option(BUILD_TESTS "Build test suite" OFF)
 
 add_subdirectory(src)
 
