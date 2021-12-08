@@ -85,10 +85,25 @@ namespace libfive {
       }
     };
 
+    static const auto sEmptyTaskDeleter = [](tbb::empty_task* ptr) {
+      /*
+       * Note copied over from the documentation of tbb::task::destroy:
+       *
+       * > Usually, calling this method is unnecessary, because a task is implicitly deleted after its execute()
+       * > method runs.  However, sometimes a task needs to be explicitly deallocated, such as when a root task
+       * > is used as the parent in spawn_and_wait_for_all.
+       */
+      tbb::task::destroy(*ptr);
+    };
+    static const auto sMakeEmptyRootTask = []() {
+      return std::unique_ptr<tbb::empty_task, decltype(sEmptyTaskDeleter)>(new (tbb::task::allocate_root()) tbb::empty_task,
+        sEmptyTaskDeleter);
+    };
+
     if constexpr (std::is_same_v<Out, void>) {
       pre(root, toRecurse, locals.local());
       if (toRecurse) {
-        auto waiter = new(tbb::task::allocate_root()) tbb::empty_task;
+        auto waiter = sMakeEmptyRootTask();
         auto children = getChildren();
         waiter->set_ref_count(children.size() + 1);
         tbb::task_list list;
@@ -108,7 +123,7 @@ namespace libfive {
     else {
       auto out = pre(root, parent, childNo, toRecurse, locals.local());
       if (toRecurse) {
-        auto waiter = new(tbb::task::allocate_root()) tbb::empty_task;
+        auto waiter = sMakeEmptyRootTask();
         auto children = getChildren();
         waiter->set_ref_count(children.size() + 1);
         tbb::task_list list;
