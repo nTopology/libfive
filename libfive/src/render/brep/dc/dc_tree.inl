@@ -739,7 +739,7 @@ double DCTree<N>::findVertex(unsigned index)
     assert(this->leaf->mass_point(N) > 0);
     Vec center = this->leaf->mass_point.template head<N>() /
                  this->leaf->mass_point(N);
-    if (es.status() != Eigen::Success) {
+    if (es.info() != Eigen::Success) {
         this->leaf->verts.col(index) = center;
         return std::numeric_limits<double>::max();
     }
