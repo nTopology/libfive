@@ -13,6 +13,7 @@ You can obtain one at http://mozilla.org/MPL/2.0/.
 #include <list>
 #include <cassert>
 #include <cstdint>
+#include <cstddef>
 
 namespace libfive {
 class ProgressHandler;
