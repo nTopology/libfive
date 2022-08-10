@@ -16,13 +16,7 @@ option(LIBFIVE_BUILD_STATIC_LIB "Build five as a static library" OFF)
 option(LIBFIVE_UNNORMALIZED_DERIVS "Use unnormalized derivs" OFF)
 option(LIBFIVE_GENERATE_GIT_VERSION "Generate git version globals" ON)
 
-<<<<<<< HEAD
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
-=======
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE RELEASE)
-endif()
->>>>>>> origin/dev/ag/t
 
 if (LIBFIVE_PACKED_OPCODES)
     message("Using packed opcodes, which breaks compatibility with saved f-reps!")
@@ -56,21 +50,8 @@ endif()
 
 if(NOT MSVC)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -g -fPIC -pedantic -Werror=switch")
-<<<<<<< HEAD
-=======
-
-    # Sometimes this flag is not supported (e.g. on Apple Silicon)
-    check_cxx_compiler_flag("-march=native" MARCH_SUPPORTED)
-    if(MARCH_SUPPORTED)
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
-    endif()
-
-    set(CMAKE_CXX_FLAGS_DEBUG "-O0")
-    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -DEIGEN_NO_DEBUG")
->>>>>>> origin/dev/ag/t
 else()
     set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
-<<<<<<< HEAD
     set(CMAKE_CXX_FLAGS "/EHsc /WX /bigobj")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4267 /wd4244 /wd4305 /wd4834")
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MD")
@@ -78,15 +59,6 @@ else()
 endif()
 
 set(CMAKE_CXX_STANDARD 11)
-=======
-    set(CMAKE_CXX_FLAGS "/EHsc /WX /D_USE_MATH_DEFINES /D_SCL_SECURE_NO_WARNINGS")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4267 /wd4244 /wd4305")
-    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MD/ /DEIGEN_NO_DEBUG /arch:AVX2")
-    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /MDd")
-endif()
-
-set(CMAKE_CXX_STANDARD 17)
->>>>>>> origin/dev/ag/t
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -102,7 +74,6 @@ endif()
 
 ################################################################################
 # Find all packages here at the top level so we can print debugging info
-<<<<<<< HEAD
 if (BUILD_STUDIO_APP)
     find_package(Qt5Core)
 endif ()
@@ -120,39 +91,6 @@ if(NOT TARGET PNG::PNG)
 endif()
 if(NOT TARGET tbb::tbb)
     find_package(TBB REQUIRED)
-=======
-if(NOT MSVC)
-    # These packages have different naming conventions in MSVC vs Linux
-    find_package(Boost REQUIRED)
-    find_package(PkgConfig REQUIRED)
-
-    pkg_check_modules(GUILE guile-2.2>=2.2.1)
-    if (NOT(GUILE_FOUND))
-        pkg_check_modules(GUILE guile-3.0>=3.0.0)
-    endif()
-
-    pkg_check_modules(EIGEN REQUIRED eigen3>=3.2.92)
-else()
-    find_package(eigen3 REQUIRED)
-    find_package(boost REQUIRED 1.65.0)
-endif()
-
-# These packages have consistent names across OS's
-find_package(PNG REQUIRED)
-find_package(Python3 COMPONENTS Interpreter Development)
-
-# Both Windows and Linux will attempt to build the Studio UI
-if (BUILD_STUDIO_APP)
-    find_package(Qt5Core 5.12)
-    if (Qt5Core_FOUND)
-        set(QtCore_FOUND 1)
-    else()
-        find_package(Qt6Core 6.0)
-        if (Qt6Core_FOUND)
-            set(QtCore_FOUND 1)
-        endif()
-    endif()
->>>>>>> origin/dev/ag/t
 endif()
 
 if (UNIX AND NOT(APPLE))
