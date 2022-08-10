@@ -31,7 +31,7 @@ public:
      *  partway through the computation.
      */
     static std::unique_ptr<Mesh> render(
-            const Tree t, const Region<3>& r,
+            const Tree& t, const Region<3>& r,
             const BRepSettings& settings);
 
     /*

@@ -20,6 +20,9 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include <QCommandLineParser>
 
 #include "studio/args.hpp"
+#include "studio/editor.hpp"
+
+namespace Studio {
 
 Arguments::Arguments(QCoreApplication* app)
 {
@@ -28,17 +31,37 @@ Arguments::Arguments(QCoreApplication* app)
     parser.addHelpOption();
     parser.addPositionalArgument("filename", "File to load");
 
-    QCommandLineOption no_syntax("no-syntax", "Turn off syntax highlighting");
-    parser.addOption(no_syntax);
-
     QCommandLineOption vertical_layout("vertical", "Use vertical layout for editor / 3D view.");
     parser.addOption(vertical_layout);
+
+    QCommandLineOption python_option(
+            QStringList() << "p" << "python",
+            "Boot the interpreter in Python mode");
+
+    QCommandLineOption guile_option(
+            QStringList() << "g" << "guile",
+            "Boot the interpreter in Guile mode");
+
+    if (Editor::supportsLanguage(Language::LANGUAGE_PYTHON)) {
+        parser.addOption(python_option);
+    }
+    if (Editor::supportsLanguage(Language::LANGUAGE_GUILE)) {
+        parser.addOption(guile_option);
+    }
 
     parser.process(*app);
 
     const QStringList ps = parser.positionalArguments();
     filename = ps.isEmpty() ? "" : ps[0];
 
-    do_syntax = !parser.isSet(no_syntax);
     vertical = parser.isSet(vertical_layout);
+
+    if (parser.isSet(python_option) && parser.isSet(guile_option))
+        std::cerr << "-p and -g cannot be set at the same time" << std::endl;
+    else if (parser.isSet(python_option))
+        language = Language::LANGUAGE_PYTHON;
+    else if (parser.isSet(guile_option))
+        language = Language::LANGUAGE_GUILE;
 }
+
+}   // namespace Studio

@@ -1,6 +1,6 @@
 /*
 Studio: a simple GUI for the libfive CAD kernel
-Copyright (C) 2017  Matt Keeter
+Copyright (C) 2017-2021  Matt Keeter
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -22,14 +22,16 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include <QMainWindow>
 #include <QMessageBox>
 #include <QFileSystemWatcher>
+#include <QSettings>
 
 #include "studio/args.hpp"
-
-class Editor;
-class View;
-struct Documentation;
+#include "studio/language.hpp"
 
 namespace libfive { class Mesh; }
+
+namespace Studio {
+class Editor;
+class View;
 
 class Window : public QMainWindow
 {
@@ -57,12 +59,13 @@ protected slots:
     void onExport(bool=false);
     void onAbout(bool=false);
     bool onLoadTutorial(bool=false);
-    void onShowDocs(bool=false);
+    bool onLoadDefault(bool=false);
     void onAutoLoad(const QString&);
+    void onAutoLoadPath(const QString&);
+    void onLanguageChanged();
     void onQuit(bool=false);
 
     void onExportReady(QList<const libfive::Mesh*> shapes);
-    void setDocs(Documentation* docs);
 
 signals:
     void exportDone();
@@ -81,6 +84,15 @@ protected:
     bool loadFile(QString f, bool reload=false);
     bool saveFile(QString f);
 
+    /* Changes the Editor language and reloads the default script
+     * (warning if there are unsaved changes) */
+    bool setLanguage(Language::Type t);
+
+    /*  Resets the script to the default for the given language,
+     *  clearing the filename and autoload parameters.  If the language
+     *  is LANGUAGE_NONE, then leave it unchanged. */
+    bool reset(Language::Type t);
+
     /*  Filename of the current file, or empty string */
     QString filename;
 
@@ -97,4 +109,8 @@ protected:
     Editor* editor;
     View* view;
     bool closing=false;
+
+    /* Used to (re)store the state of the application */
+    QSettings settings;
 };
+}   // namespace Studio

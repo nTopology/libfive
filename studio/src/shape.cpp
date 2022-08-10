@@ -22,20 +22,24 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "libfive/eval/tape.hpp"
 #include "libfive/eval/evaluator.hpp"
 
+namespace Studio {
+
 const int Shape::MESH_DIV_EMPTY;
 const int Shape::MESH_DIV_ABORT;
 const int Shape::MESH_DIV_NEW_VARS;
 const int Shape::MESH_DIV_NEW_VARS_SMALL;
 
-Shape::Shape(libfive::Tree t, std::map<libfive::Tree::Id, float> vars)
-    : tree(t), vars(vars), vert_vbo(QOpenGLBuffer::VertexBuffer),
+Shape::Shape(const libfive::Tree& t,
+             std::map<libfive::Tree::Id, float> vars)
+    : tree(t.optimized()), vars(vars),
+      vert_vbo(QOpenGLBuffer::VertexBuffer),
       tri_vbo(QOpenGLBuffer::IndexBuffer)
 {
     // Construct evaluators to run meshing (in parallel)
     es.reserve(8);
     for (unsigned i=0; i < es.capacity(); ++i)
     {
-        es.emplace_back(libfive::Evaluator(t, vars));
+        es.emplace_back(libfive::Evaluator(tree, vars));
     }
 
     connect(this, &Shape::gotMesh, this, &Shape::redraw);
@@ -245,7 +249,11 @@ void Shape::startRender(RenderSettings s)
 
         timer.start();
         running = true;
+#if QT_VERSION >= 0x060000
+        mesh_future = QtConcurrent::run(&Shape::renderMesh, this, s);
+#else
         mesh_future = QtConcurrent::run(this, &Shape::renderMesh, s);
+#endif
         mesh_watcher.setFuture(mesh_future);
 
         next = {s.settings, s.div - 1, s.alg};
@@ -353,6 +361,12 @@ void Shape::freeGL()
     }
 }
 
+libfive::Tree::Id Shape::getUniqueId(
+    std::unordered_map<libfive::TreeDataKey, libfive::Tree>& canonical)
+{
+    return tree.cooptimize(canonical).id();
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // This function is called in a separate thread:
 Shape::BoundedMesh Shape::renderMesh(RenderSettings s)
@@ -370,3 +384,5 @@ Shape::BoundedMesh Shape::renderMesh(RenderSettings s)
     auto m = libfive::Mesh::render(es.data(), r, mesh_settings);
     return {m.release(), r};
 }
+
+}   // namespace Studio

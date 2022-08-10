@@ -6,6 +6,12 @@ This Source Code Form is subject to the terms of the Mozilla Public
 License, v. 2.0. If a copy of the MPL was not distributed with this file,
 You can obtain one at http://mozilla.org/MPL/2.0/.
 */
+#include <cstdlib>
+
+#if _MSC_VER
+#include <malloc.h>
+#include <stdio.h>
+#endif
 
 #define DEFAULT_OPERATORS_NEW_AND_DELETE \
     /*  Required for ObjectPool, but we're just using the default */\
@@ -35,3 +41,30 @@ You can obtain one at http://mozilla.org/MPL/2.0/.
         ::operator delete(ptr, args...);                            \
     }
 
+// Eigen 4 makes EIGEN_MAKE_ALIGNED_OPERATOR_NEW a no-op, but... this doesn't
+// seem to work (see libfive issues #462 and #464).  This macro replaces it
+// for new Eigen versions, while staying backwards-compatible for Eigen 3.x
+#if EIGEN_MAJOR_VERSION == 4
+#if _MSC_VER
+#define ALIGNED_OPERATOR_NEW_AND_DELETE(T) \
+    void *operator new[](std::size_t size) {                        \
+        return _aligned_malloc(size, std::alignment_of_v<T>);       \
+    }                                                               \
+                                                                    \
+    void operator delete[](void* ptr) {                             \
+        _aligned_free(ptr);                                         \
+    }
+#else
+#define ALIGNED_OPERATOR_NEW_AND_DELETE(T) \
+    void *operator new[](std::size_t size) {                        \
+        using namespace std;                                        \
+        return aligned_alloc(std::alignment_of_v<T>, size);         \
+    }                                                               \
+                                                                    \
+    void operator delete[](void* ptr) {                             \
+        ::operator delete[](ptr);                                   \
+    }
+#endif
+#else
+#define ALIGNED_OPERATOR_NEW_AND_DELETE(T) EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+#endif

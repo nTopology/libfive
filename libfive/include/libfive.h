@@ -11,7 +11,6 @@ You can obtain one at http://mozilla.org/MPL/2.0/.
 #ifdef __cplusplus
 #include <cstdint>
 #include "libfive/tree/tree.hpp"
-#include "libfive/tree/archive.hpp"
 #include "libfive/eval/evaluator.hpp"
 extern "C" {
 #else
@@ -182,19 +181,11 @@ void libfive_vars_delete(libfive_vars* j);
 ////////////////////////////////////////////////////////////////////////////////
 
 #ifdef __cplusplus
-typedef libfive::Tree* libfive_tree;
-typedef libfive::Tree::Id libfive_id;
-typedef libfive::Archive* libfive_archive;
+typedef const libfive::Tree::Data* libfive_tree;
 typedef libfive::Evaluator *libfive_evaluator;
 #else
 typedef struct libfive_tree_ libfive_tree_;
 typedef struct libfive_tree_* libfive_tree;
-
-typedef struct libfive_id_ libfive_id_;
-typedef struct libfive_id_* libfive_id;
-
-typedef struct libfive_archive_ libfive_archive_;
-typedef struct libfive_archive_* libfive_archive;
 
 typedef struct libfive_evaluator_ libfive_evaluator_;
 typedef struct libfive_evaluator_ *libfive_evaluator;
@@ -237,16 +228,10 @@ libfive_tree libfive_tree_const(float f);
 float libfive_tree_get_const(libfive_tree t, bool* success);
 
 /*
- *  Wraps a tree in an operation that sets the derivatives with respect to
- *  all of its free variables to zero.
- */
-libfive_tree libfive_tree_constant_vars(libfive_tree t);
-
-/*
  *  Constructs a tree with the given no-argument opcode
  *  Returns NULL if the opcode is invalid.
  */
-libfive_tree libfive_tree_nonary(int op);
+libfive_tree libfive_tree_nullary(int op);
 
 /*
  *  Constructs a tree with the given one-argument opcode
@@ -261,8 +246,12 @@ libfive_tree libfive_tree_unary(int op, libfive_tree a);
 libfive_tree libfive_tree_binary(int op, libfive_tree a, libfive_tree b);
 
 /*
- *  Returns a unique ID for the given tree.  This is post-deduplication,
- *  e.g. all constant tree of value 1.0 will return the same id.
+ *  Returns a unique ID for the given tree.  There is no global deduplication;
+ *  e.g. multiple calls to libfive_tree_const(1.0) will return trees with
+ *  different IDs.
+ *
+ *  This is primarily used to uniquely identify free variables, i.e. trees
+ *  returned from libfive_tree_var().
  */
 const void* libfive_tree_id(libfive_tree t);
 
@@ -286,11 +275,6 @@ libfive_interval libfive_tree_eval_r(libfive_tree t, libfive_region3 r);
 libfive_vec3 libfive_tree_eval_d(libfive_tree t, libfive_vec3 p);
 
 /*
- *  Checks whether two trees are equal, taking deduplication into account
- */
-bool libfive_tree_eq(libfive_tree a, libfive_tree b);
-
-/*
  *  Deletes a tree.  If binding in a higher-level language, call this in
  *  a destructor / finalizer to avoid leaking memory
  */
@@ -309,12 +293,22 @@ libfive_tree libfive_tree_remap(libfive_tree p,
         libfive_tree x, libfive_tree y, libfive_tree z);
 
 /*
+ *  Returns an optimized version of the given tree
+ */
+libfive_tree libfive_tree_optimized(libfive_tree t);
+
+/*
  *  Returns a C string representing the tree in Scheme style
  *  (e.g. "(+ 1 2 x y)" )
  *
- *  The caller is responsible for freeing the string with free()
+ *  The caller is responsible for freeing the string with libfive_free()
  */
 char* libfive_tree_print(libfive_tree t);
+
+/*
+ *  Frees a string allocated by libfive (probably by libfive_tree_print
+ */
+void libfive_free_str(char* ptr);
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -387,8 +381,7 @@ bool libfive_tree_save_mesh(libfive_tree tree, libfive_region3 R,
  *  See other argument details in libfive_tree_render_mesh
  */
 bool libfive_evaluator_save_mesh(libfive_evaluator evaluator, libfive_region3 R,
-                                   const char *f);
-
+                                 const char *f);
 
 /*
  *  Renders and saves multiple meshes mesh to a file
@@ -421,7 +414,7 @@ libfive_pixels* libfive_tree_render_pixels(libfive_tree tree,
 libfive_evaluator libfive_tree_evaluator(libfive_tree tree, libfive_vars vars);
 
 /*
- *  Upates the variables of the evaluator
+ *  Updates the variables of the evaluator
  */
 bool libfive_evaluator_update_vars(libfive_evaluator eval_tree, libfive_vars vars);
 

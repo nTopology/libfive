@@ -23,31 +23,9 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include <QString>
 #include <QMap>
 
-struct Documentation
-{
-public:
-    struct Function {
-        /*  One or the other should be populated here */
-        QString doc;
-        QString alias;
-    };
+namespace Studio {
 
-    /*
-     *  Stores a new function in the documentation
-     */
-    void insert(QString module, QString name, QString doc);
-
-    /*
-     *  Looks through the docs to find functions whose docstrings
-     *  refer to a different function name, then marks them as aliases
-     *
-     *  Prints a warning if there is a broken alias
-     */
-    void buildAliases();
-
-    /*  Map from module name to map of functions */
-    QMap<QString, QMap<QString, Function>> docs;
-};
+typedef QMap<QString, QMap<QString, QString>> Documentation;
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -55,25 +33,25 @@ class DocumentationPane : public QWidget
 {
     Q_OBJECT
 public:
-    /*
-     *  We can only call this constructor after setDocs has been called
-     *  (throws an assertion otherwise)
-     */
-    DocumentationPane();
+    DocumentationPane(Documentation docs);
 
-    static void setDocs(Documentation* ds);
-    static bool hasDocs();
-    static void open();
+    /*  Shows the documentation pane and makes the search window focused */
+    void show();
+
 
 protected:
     /*
-     *  Special-case handling of escape (closes window)
+     *  Hides the completer popup in the close event; otherwise, if the
+     *  DocumentationPane is closed by pressing the button in the corner,
+     *  the completer popup remains awkwardly floating by itself.
+     */
+    void closeEvent(QCloseEvent* event) override;
+
+    /*
+     *  Special-case handling of escape (hides the window)
      */
     bool eventFilter(QObject* object, QEvent* event) override;
 
-    /*  Take ownership of the documentation  */
-    static QScopedPointer<Documentation> docs;
-    static QPointer<DocumentationPane> instance;
-
-    QLineEdit* search;
+    QLineEdit* m_search;
 };
+} // namespace Studio

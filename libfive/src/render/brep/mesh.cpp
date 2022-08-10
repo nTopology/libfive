@@ -34,11 +34,15 @@ You can obtain one at http://mozilla.org/MPL/2.0/.
 
 namespace libfive {
 
-std::unique_ptr<Mesh> Mesh::render(const Tree t, const Region<3>& r,
+std::unique_ptr<Mesh> Mesh::render(const Tree& t_, const Region<3>& r,
                                    const BRepSettings& settings)
 {
-    tbb::enumerable_thread_specific<Evaluator> 
-        es([&t]() {return Evaluator(t); });
+    std::vector<Evaluator, Eigen::aligned_allocator<Evaluator>> es;
+    es.reserve(settings.workers);
+    const auto t = t_.optimized();
+    for (unsigned i=0; i < settings.workers; ++i) {
+        es.emplace_back(Evaluator(t));
+    }
 
     return render(es, r, settings);
 }

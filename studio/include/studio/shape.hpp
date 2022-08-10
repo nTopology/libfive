@@ -31,15 +31,18 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "libfive/render/brep/region.hpp"
 #include "libfive/render/brep/settings.hpp"
 
+#include "studio/settings.hpp"
+
 namespace libfive { class Tape; /*  forward declaration */ }
 
-#include "studio/settings.hpp"
+namespace Studio {
 
 class Shape : public QObject, QOpenGLFunctions
 {
     Q_OBJECT
 public:
-    Shape(libfive::Tree t, std::map<libfive::Tree::Id, float> vars);
+    Shape(const libfive::Tree& t,
+          std::map<libfive::Tree::Id, float> vars);
 
     /*
      *  In destructor, wait for computation to finish
@@ -137,6 +140,12 @@ public:
      */
     void freeGL();
 
+    /*
+     *  Returns a unique ID using the given deduplication map
+     */
+    libfive::Tree::Id getUniqueId(
+        std::unordered_map<libfive::TreeDataKey, libfive::Tree>& canonical);
+
 signals:
     void gotMesh();
     void redraw();
@@ -186,7 +195,7 @@ protected:
     QOpenGLBuffer vert_vbo;
     QOpenGLBuffer tri_vbo;
 
-    QTime timer;
+    QElapsedTimer timer;
 
     const static int MESH_DIV_EMPTY=-1;
     const static int MESH_DIV_ABORT=-2;
@@ -196,3 +205,5 @@ protected:
     int default_div=MESH_DIV_EMPTY;
     int target_div=MESH_DIV_EMPTY;
 };
+
+} // namespace Studio

@@ -49,7 +49,7 @@ TEST_CASE("Solver::findRoot")
 
         // Here, we should walk down towards 0, so we'd expect both
         // variables to be scaled by the same size
-        REQUIRE(res == Approx(0));
+        REQUIRE(res == Approx(0).margin(1e-6));
         REQUIRE(vals.size() == 2);
         REQUIRE(vals.at(a.id()) == Approx(0.5145));
         REQUIRE(vals.at(b.id()) == Approx(0.8575));
@@ -109,7 +109,7 @@ TEST_CASE("Solver::findRoot")
                     {{ax.id(), -3}, {ay.id(), 3},
                      {bx.id(), 1}, {by.id(), 0},
                      {cx.id(), 3}, {cy.id(), 2}});
-        }
+        };
 
         auto res = out.first;
         auto vals = out.second;

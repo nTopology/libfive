@@ -12,6 +12,7 @@ You can obtain one at http://mozilla.org/MPL/2.0/.
 #include <array>
 
 #include "libfive/render/brep/util.hpp"
+#include "libfive/render/brep/default_new_delete.hpp"
 
 namespace libfive {
 
@@ -230,8 +231,8 @@ public:
      */
     Region<N> withResolution(double min_feature) const {
         const auto min_dimension = (upper - lower).minCoeff();
-        const auto level = ceil(fmax(0.0, log(min_dimension / min_feature)) /
-                                log(2));
+        const auto level = ceil(fmaxf(0.0f, logf(min_dimension / min_feature)) /
+                                logf(2));
         return Region<N>(lower, upper, perp, level);
     }
 
@@ -269,7 +270,8 @@ public:
     int32_t level;
 
     /*  Boilerplate for an object that contains an Eigen struct  */
-    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+    ALIGNED_OPERATOR_NEW_AND_DELETE(Region)
+
 };
 
 }   // namespace libfive

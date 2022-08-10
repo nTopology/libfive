@@ -20,6 +20,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 #include "studio/camera.hpp"
 
+namespace Studio {
+
 Camera::Camera(QSize size)
     : size(size), anim(this, "perspective")
 {
@@ -67,8 +69,8 @@ QMatrix4x4 Camera::M() const
 
 void Camera::rotateIncremental(QPoint delta)
 {
-    pitch += delta.y();
-    yaw += delta.x();
+    pitch += rotationSensitivity*float(delta.y()/float(size.height()));
+    yaw += rotationSensitivity*float(delta.x()/float(size.width()));
 
     pitch = fmax(fmin(pitch, 180), 0);
     yaw = fmod(yaw, 360);
@@ -139,6 +141,11 @@ void Camera::toTurnY()
     animateAxis(QQuaternion::fromDirection({0, 1, 0}, {0, 0, 1}));
 }
 
+void Camera::setRotationSensitivity(float sensitivity)
+{
+    rotationSensitivity = sensitivity;
+}
+
 void Camera::zoomTo(const QVector3D& min, const QVector3D& max)
 {
     QVector3D center_start = center;
@@ -164,3 +171,5 @@ void Camera::zoomTo(const QVector3D& min, const QVector3D& max)
     connect(a, &QPropertyAnimation::finished, this, &Camera::animDone);
     a->start(a->DeleteWhenStopped);
 }
+
+}   // namespace Studio

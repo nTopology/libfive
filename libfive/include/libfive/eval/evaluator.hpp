@@ -18,7 +18,6 @@ class Evaluator : public JacobianEvaluator, public IntervalEvaluator
 public:
     Evaluator(const Tree& root) :
         Evaluator(std::make_shared<Deck>(root)) {}
-
     Evaluator(const Tree& root,
               const std::map<Tree::Id, float>& vars) :
         Evaluator(std::make_shared<Deck>(root), vars) {}
@@ -32,7 +31,7 @@ public:
         JacobianEvaluator(t, vars),
         IntervalEvaluator(t, vars) {}
 
-    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+    ALIGNED_OPERATOR_NEW_AND_DELETE(Evaluator)
 
     std::shared_ptr<Deck> getDeck() { return BaseEvaluator::deck; }
 
@@ -51,7 +50,7 @@ public:
             changed |= IntervalEvaluator::setVar(v.first, v.second);
         }
         return changed;
-}
+    }
 };
 
 }   // namespace libfive

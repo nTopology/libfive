@@ -200,7 +200,7 @@ TEST_CASE("Mesh::render (performance)", "[!benchmark]")
         BRepSettings settings;
         settings.min_feature = 0.02;
         auto mesh = Mesh::render(sponge, r, settings);
-    }
+    };
 
     BENCHMARK("Gradient blended-round spheres")
     {
@@ -215,7 +215,7 @@ TEST_CASE("Mesh::render (performance)", "[!benchmark]")
         BRepSettings settings;
         settings.min_feature = 0.025;
         auto mesh = Mesh::render(blendObj, r, settings);
-    }
+    };
 
     BENCHMARK("Sphere / gyroid intersection")
     {
@@ -224,7 +224,7 @@ TEST_CASE("Mesh::render (performance)", "[!benchmark]")
         BRepSettings settings;
         settings.min_feature = 0.025;
         auto mesh = Mesh::render(sphereGyroid(), r, settings);
-    }
+    };
 }
 
 TEST_CASE("Mesh::render (gyroid performance breakdown)", "[!benchmark]")
@@ -237,24 +237,24 @@ TEST_CASE("Mesh::render (gyroid performance breakdown)", "[!benchmark]")
 
     BENCHMARK("DCTree construction")
     {
-        t = Root<DCTree<3>>::build(sphereGyroid(), r, settings);
-    }
+        t = DCWorkerPool<3>::build(sphereGyroid(), r, settings);
+    };
 
     std::unique_ptr<Mesh> m;
     BENCHMARK("Mesh building")
     {
         m = Dual<3>::walk<DCMesher>(t, settings);
-    }
+    };
 
     BENCHMARK("DCTree deletion")
     {
         t.reset(BRepSettings());
-    }
+    };
 
     BENCHMARK("Mesh deletion")
     {
         m.reset();
-    }
+    };
 }
 
 class TestProgressHandler : public ProgressHandler
@@ -277,19 +277,19 @@ TEST_CASE("Mesh::render (gyroid with progress callback)", "[!benchmark]")
 
     BENCHMARK("DCTree construction")
     {
-        t = Root<DCTree<3>>::build(sphereGyroid(), r, settings);
-    }
+        t = DCWorkerPool<3>::build(sphereGyroid(), r, settings);
+    };
 
     std::unique_ptr<Mesh> m;
     BENCHMARK("Mesh building")
     {
         m = Dual<3>::walk<DCMesher>(t, settings);
-    }
+    };
 
     BENCHMARK("DCTree deletion")
     {
         t.reset(settings);
-    }
+    };
 
     // Confirm that the progress counter is monotonically increasing
     CAPTURE(progress.ps);

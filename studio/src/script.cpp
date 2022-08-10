@@ -16,123 +16,23 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
-#include <QDebug>
-#include <QKeyEvent>
-
 #include "studio/script.hpp"
+#include "studio/formatter.hpp"
+
+namespace Studio {
+
+void Script::bind(Formatter* f) {
+    m_formatter = f;
+}
 
 void Script::keyPressEvent(QKeyEvent* e)
 {
-    // By default, we'll accept the event here.
-    // If it doesn't meet any of our conditions, then we'll set it as
-    // ignored in the final else statement, then call the default key
-    // press handler for QPlainTextEdit.
-    e->setAccepted(true);
-
-    auto c = textCursor();
-    if (e->key() == Qt::Key_Tab)
-    {
-        // Tab does block-level indentation if we've selected text
-        if (c.hasSelection())
-        {
-            auto a = c.selectionStart();
-            auto b = c.selectionEnd();
-
-            c.setPosition(a);
-            c.beginEditBlock();
-            while (true)
-            {
-                c.movePosition(QTextCursor::StartOfLine);
-                c.insertText("  ");
-                c.movePosition(QTextCursor::Down);
-
-                if (c.position() == a || c.position() > b)
-                {
-                    break;
-                }
-                a = c.position();
-            }
-            c.endEditBlock();
-        }
-        // Otherwise, it does aligned 2-space indentation
-        else
-        {
-            insertPlainText((c.columnNumber() & 1) ? " " : "  ");
-        }
+    if (m_formatter) {
+        m_formatter->keyPressEvent(this, e);
     }
-    else if (e->key() == Qt::Key_Backtab && c.hasSelection())
-    {
-        auto a = c.selectionStart();
-        auto b = c.selectionEnd();
-
-        c.setPosition(a);
-        c.beginEditBlock();
-        while (true)
-        {
-            c.movePosition(QTextCursor::StartOfLine);
-            for (unsigned i=0; i < 2; ++i)
-            {
-                c.movePosition(QTextCursor::Right,
-                               QTextCursor::KeepAnchor);
-                if (c.selectedText() == " ")
-                {
-                    c.removeSelectedText();
-                }
-            }
-            c.movePosition(QTextCursor::Down);
-
-            if (c.position() == a || c.position() > b)
-            {
-                break;
-            }
-            a = c.position();
-        }
-        c.endEditBlock();
-    }
-    else if (e->key() == Qt::Key_Return && !c.hasSelection())
-    {
-        // Count the number of leading spaces on this line
-        c.movePosition(QTextCursor::StartOfLine);
-        auto prev_pos = c.position();
-        c.movePosition(QTextCursor::Right, QTextCursor::KeepAnchor);
-        while (*c.selectedText().rbegin() == ' ' && c.position() > prev_pos)
-        {
-            prev_pos = c.position();
-            c.movePosition(QTextCursor::Right, QTextCursor::KeepAnchor);
-        }
-
-        // Figure out if we stopped searching due to a non-space character
-        // or hitting the end of the document
-        auto length = c.selectedText().length() - 1;
-        length += (*c.selectedText().rbegin() == ' ');
-
-        // Then match the number of leading spaces
-        insertPlainText("\n" + QString(length, ' '));
-    }
-    // Backspace does 2-space aligned deletion of spaces, and deletes
-    // a single character otherwise.
-    else if (e->key() == Qt::Key_Backspace && !c.hasSelection())
-    {
-        bool was_space;
-        {
-            auto c_ = textCursor();
-            c_.movePosition(QTextCursor::Left, QTextCursor::KeepAnchor);
-            was_space = (c_.selectedText() == " ");
-        }
-
-        c.deletePreviousChar();
-        if (was_space && (c.columnNumber() & 1) && c.columnNumber() != 0)
-        {
-            c.movePosition(QTextCursor::Left, QTextCursor::KeepAnchor);
-            if (c.selectedText() == " ")
-            {
-                c.deletePreviousChar();
-            }
-        }
-    }
-    else
-    {
-        e->setAccepted(false);
+    if (!e->isAccepted()) {
         QPlainTextEdit::keyPressEvent(e);
     }
 }
+
+}   // namespace Studio

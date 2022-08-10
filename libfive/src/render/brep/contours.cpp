@@ -23,10 +23,16 @@ namespace libfive {
 ////////////////////////////////////////////////////////////////////////////////
 
 std::unique_ptr<Contours> Contours::render(
-        const Tree t, const Region<2>& r,
+        const Tree& t_, const Region<2>& r,
         const BRepSettings& settings)
 {
-    tbb::enumerable_thread_specific<Evaluator> es([&t]() {return Evaluator(t); });
+    std::vector<Evaluator, Eigen::aligned_allocator<Evaluator>> es;
+    es.reserve(settings.workers);
+    const auto t = t_.optimized();
+    for (unsigned i=0; i < settings.workers; ++i)
+    {
+        es.emplace_back(Evaluator(t));
+    }
 
     // Create the quadtree on the scaffold
     auto xtree = Root<DCTree<2>>::build(es, r, settings);

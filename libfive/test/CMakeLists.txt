@@ -1,7 +1,6 @@
 set(SRCS main.cpp
     api.cpp
     archive.cpp
-    cache.cpp
     contours.cpp
     deck.cpp
     dual.cpp
@@ -34,13 +33,25 @@ set(SRCS main.cpp
     xtree.cpp
     util/mesh_checks.cpp
     util/shapes.cpp)
-set(LIBS five)
-
-if (BUILD_GUILE_BINDINGS AND GUILE_FOUND)
-    set(SRCS ${SRCS} guile.cpp)
-    set(LIBS ${LIBS} five-guile)
-endif(BUILD_GUILE_BINDINGS AND GUILE_FOUND)
+set(LIBS libfive)
 
 add_executable(libfive-test ${SRCS})
 target_link_libraries(libfive-test ${LIBS})
 target_include_directories(libfive-test PRIVATE .)
+target_compile_definitions(libfive-test PRIVATE -DCATCH_CONFIG_ENABLE_BENCHMARKING)
+
+if (BUILD_GUILE_BINDINGS AND GUILE_FOUND)
+    target_sources(libfive-test PRIVATE guile.cpp)
+    target_link_libraries(libfive-test ${GUILE_LIBRARIES})
+    target_include_directories(libfive-test PUBLIC . ${GUILE_INCLUDE_DIRS})
+    target_link_directories(libfive-test PUBLIC ${GUILE_LIBRARY_DIRS})
+endif(BUILD_GUILE_BINDINGS AND GUILE_FOUND)
+
+if (MSVC)
+    # Copy the libfive DLL into the build/libfive/test directory, so that
+    # libfive-test.exe can find them
+    add_custom_command(TARGET libfive-test POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_FILE:libfive>
+            $<TARGET_FILE_DIR:libfive-test>)
+endif (MSVC)

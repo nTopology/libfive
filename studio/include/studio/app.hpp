@@ -21,6 +21,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 #include "studio/window.hpp"
 
+namespace Studio {
 class App : public QApplication
 {
     Q_OBJECT
@@ -29,5 +30,6 @@ public:
 protected:
     bool event(QEvent* event) override;
 
-    Window window;
+    QScopedPointer<Window> window;
 };
+}   // namespace Studio

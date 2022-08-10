@@ -12,8 +12,6 @@ You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include "catch.hpp"
 
-#include "libfive-guile.h"
-
 ////////////////////////////////////////////////////////////////////////////////
 
 static SCM eval_inner(void* body) {
@@ -34,13 +32,15 @@ static std::string eval(std::string input) {
     if (!initialized)
     {
         scm_init_guile();
-        scm_init_libfive_modules();
+        scm_c_eval_string(
+            "(add-to-load-path (string-append (getcwd) \"/../libfive/bind/guile\"))");
         scm_c_use_module("libfive kernel");
         scm_c_use_module("libfive vec");
-        scm_c_use_module("libfive csg");
-        scm_c_use_module("libfive shapes");
         scm_c_use_module("libfive util");
         scm_c_use_module("libfive sandbox");
+        scm_c_use_module("libfive stdlib csg");
+        scm_c_use_module("libfive stdlib shapes");
+        scm_c_use_module("libfive stdlib transforms");
         initialized = true;
     }
 
@@ -138,9 +138,17 @@ TEST_CASE("#[vector notation]")
 
 TEST_CASE("shape-eval")
 {
-    auto result = eval(
-            "(shape-eval (lambda-shape (x y z) (* x (/ 1 z))) #[0 0 0])");
-    REQUIRE(result == "+nan.0");
+    SECTION("NaN") {
+        auto result = eval(
+                "(shape-eval (lambda-shape (x y z) (* x (/ 1 z))) #[0 0 0])");
+        REQUIRE(result == "+nan.0");
+    }
+
+    SECTION("sqrt") {
+        auto result = eval(
+                "(shape-eval (lambda-shape (x y z) (sqrt x)) #[0 0 0])");
+        REQUIRE(result == "0.0");
+    }
 }
 
 TEST_CASE("eval-sandboxed")
@@ -185,4 +193,23 @@ TEST_CASE("libfive-guile CSG")
 
     CAPTURE(result);
     REQUIRE(boost::algorithm::starts_with(result, "#<<shape> "));
+}
+
+TEST_CASE("libfive-guile: scale-xyz without center position")
+{
+    auto result = eval(R"(
+        (scale-xyz
+            (box #[0 0 0] #[10 10 10])
+            #[1 2 3]
+        ) )");
+
+    CAPTURE(result);
+    REQUIRE(boost::algorithm::starts_with(result, "#<<shape> "));
+}
+
+TEST_CASE("libfive-guile: pi")
+{
+    auto result = eval("pi");
+    CAPTURE(result);
+    REQUIRE(boost::algorithm::starts_with(result, "3.1415"));
 }

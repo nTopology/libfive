@@ -251,7 +251,25 @@ std::unique_ptr<typename M::Output> Dual<N>::walk_(
     };
 
 
-    std::atomic<uint32_t> global_index(1);
+    // Handle the top tree edges (only used for simplex meshing)
+    if (M::needsTopEdges()) {
+        auto m = MesherFactory(breps[0], 0);
+        Dual<N>::handleTopEdges(t.get(), m);
+    }
+
+    auto out = std::make_unique<typename M::Output>();
+    out->collect(breps);
+    return out;
+}
+
+
+template <unsigned N>
+template <typename T, typename V>
+void Dual<N>::run(V& v,
+                  boost::lockfree::stack<const T*,
+                                         boost::lockfree::fixed_sized<true>>& tasks,
+                  const BRepSettings& settings,
+                  std::atomic_bool& done)
 
     tbb::enumerable_thread_specific<Local> locals(
         [&MesherFactory, &global_index]()

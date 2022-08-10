@@ -3,9 +3,12 @@ project(libfive)
 
 # Properly distinguish between Apple and upstream Clang
 cmake_policy(SET CMP0025 NEW)
+include(CheckCXXCompilerFlag)
 
 option(BUILD_STUDIO_APP "Build Studio application" ON)
 option(BUILD_GUILE_BINDINGS "Build Guile bindings" ON)
+option(BUILD_PYTHON_BINDINGS "Build Python bindings" ON)
+
 option(LIBFIVE_PACKED_OPCODES
     "Tightly pack opcodes (breaks compatibility with older saved f-reps)"
     OFF)
@@ -13,7 +16,13 @@ option(LIBFIVE_BUILD_STATIC_LIB "Build five as a static library" OFF)
 option(LIBFIVE_UNNORMALIZED_DERIVS "Use unnormalized derivs" OFF)
 option(LIBFIVE_GENERATE_GIT_VERSION "Generate git version globals" ON)
 
+<<<<<<< HEAD
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
+=======
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE RELEASE)
+endif()
+>>>>>>> origin/dev/ag/t
 
 if (LIBFIVE_PACKED_OPCODES)
     message("Using packed opcodes, which breaks compatibility with saved f-reps!")
@@ -47,10 +56,21 @@ endif()
 
 if(NOT MSVC)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -g -fPIC -pedantic -Werror=switch")
+<<<<<<< HEAD
+=======
+
+    # Sometimes this flag is not supported (e.g. on Apple Silicon)
+    check_cxx_compiler_flag("-march=native" MARCH_SUPPORTED)
+    if(MARCH_SUPPORTED)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
+    endif()
+
+    set(CMAKE_CXX_FLAGS_DEBUG "-O0")
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -DEIGEN_NO_DEBUG")
+>>>>>>> origin/dev/ag/t
 else()
-    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}/Output/Debug)
-    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}/Output/Release)
     set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
+<<<<<<< HEAD
     set(CMAKE_CXX_FLAGS "/EHsc /WX /bigobj")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4267 /wd4244 /wd4305 /wd4834")
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MD")
@@ -58,6 +78,15 @@ else()
 endif()
 
 set(CMAKE_CXX_STANDARD 11)
+=======
+    set(CMAKE_CXX_FLAGS "/EHsc /WX /D_USE_MATH_DEFINES /D_SCL_SECURE_NO_WARNINGS")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4267 /wd4244 /wd4305")
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MD/ /DEIGEN_NO_DEBUG /arch:AVX2")
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /MDd")
+endif()
+
+set(CMAKE_CXX_STANDARD 17)
+>>>>>>> origin/dev/ag/t
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -73,6 +102,7 @@ endif()
 
 ################################################################################
 # Find all packages here at the top level so we can print debugging info
+<<<<<<< HEAD
 if (BUILD_STUDIO_APP)
     find_package(Qt5Core)
 endif ()
@@ -90,6 +120,39 @@ if(NOT TARGET PNG::PNG)
 endif()
 if(NOT TARGET tbb::tbb)
     find_package(TBB REQUIRED)
+=======
+if(NOT MSVC)
+    # These packages have different naming conventions in MSVC vs Linux
+    find_package(Boost REQUIRED)
+    find_package(PkgConfig REQUIRED)
+
+    pkg_check_modules(GUILE guile-2.2>=2.2.1)
+    if (NOT(GUILE_FOUND))
+        pkg_check_modules(GUILE guile-3.0>=3.0.0)
+    endif()
+
+    pkg_check_modules(EIGEN REQUIRED eigen3>=3.2.92)
+else()
+    find_package(eigen3 REQUIRED)
+    find_package(boost REQUIRED 1.65.0)
+endif()
+
+# These packages have consistent names across OS's
+find_package(PNG REQUIRED)
+find_package(Python3 COMPONENTS Interpreter Development)
+
+# Both Windows and Linux will attempt to build the Studio UI
+if (BUILD_STUDIO_APP)
+    find_package(Qt5Core 5.12)
+    if (Qt5Core_FOUND)
+        set(QtCore_FOUND 1)
+    else()
+        find_package(Qt6Core 6.0)
+        if (Qt6Core_FOUND)
+            set(QtCore_FOUND 1)
+        endif()
+    endif()
+>>>>>>> origin/dev/ag/t
 endif()
 
 if (UNIX AND NOT(APPLE))
@@ -106,27 +169,50 @@ if (BUILD_GUILE_BINDINGS)
   find_package(PkgConfig REQUIRED)
   pkg_check_modules(GUILE guile-2.2>=2.2.1)
   if (GUILE_FOUND)
-    message("  libfive-guile:	✓")
-
-    # Sadly, this is a global setting (there's no target_link_directories)
-    link_directories(${GUILE_LIBRARY_DIRS})
+    message("  Guile bindings:	✓")
   else ()
-    message("  libfive-guile:	✘   (needs Guile 2.2 or later)")
+    message("  Guile bindings:	✘   (needs Guile 2.2 or later)")
   endif()
 else()
-    message("  libfive-guile:	✘   (skipping)")
+    message("  Guile bindings:	✘   (skipping)")
+endif()
+
+if (BUILD_PYTHON_BINDINGS)
+  if (Python3_FOUND)
+    message("  Python bindings:	✓")
+  else()
+    message("  Python bindings:	✘   (Python 3 not found)")
+  endif()
+else()
+  message("  Python bindings:	✘   (skipping)")
 endif()
 
 if (BUILD_STUDIO_APP)
-  if (Qt5Core_FOUND AND GUILE_FOUND)
-    message("  Studio:		✓")
+  if (GUILE_FOUND AND BUILD_GUILE_BINDINGS)
+    set(STUDIO_WITH_GUILE ON)
+  else()
+    set(STUDIO_WITH_GUILE OFF)
+  endif()
+
+  if (Python3_FOUND AND BUILD_PYTHON_BINDINGS)
+    set(STUDIO_WITH_PYTHON ON)
+  else()
+    set(STUDIO_WITH_PYTHON OFF)
+  endif()
+
+  if (QtCore_FOUND AND STUDIO_WITH_GUILE AND STUDIO_WITH_PYTHON)
+    message("  Studio:		✓   (Python + Guile)")
+  elseif (QtCore_FOUND AND STUDIO_WITH_GUILE)
+    message("  Studio:		✓   (Guile only)")
+  elseif (QtCore_FOUND AND STUDIO_WITH_PYTHON)
+    message("  Studio:		✓   (Python only)")
   else ()
-    if (Qt5Core_FOUND)
-      message("  Studio:		✘   (needs Guile 2.2 or later)")
-    elseif (GUILE_FOUND)
-      message("  Studio:		✘   (Qt 5.7 or later)")
+    if (QtCore_FOUND)
+      message("  Studio:		✘   (needs Guile or Python)")
+    elseif (STUDIO_WITH_GUILE OR STUDIO_WITH_PYTHON)
+      message("  Studio:		✘   (needs Qt 5.12 or later)")
     else()
-      message("  Studio:		✘   (needs Guile 2.2 or later and Qt 5.7 or later)")
+      message("  Studio:		✘   (needs Qt 5.12 or later, and Guile or Python")
     endif()
   endif()
 else()
@@ -141,6 +227,6 @@ set(LIBFIVE_BUILD_FROM_ROOT true)
 # Always build the kernel and test suite
 add_subdirectory(libfive)
 
-if(BUILD_STUDIO_APP AND GUILE_FOUND AND Qt5Core_FOUND)
+if(BUILD_STUDIO_APP AND (STUDIO_WITH_GUILE OR STUDIO_WITH_PYTHON) AND QtCore_FOUND)
     add_subdirectory(studio)
-endif(BUILD_STUDIO_APP AND GUILE_FOUND AND Qt5Core_FOUND)
+endif()

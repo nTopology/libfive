@@ -18,51 +18,42 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
 #include <iostream>
 
+#include <QAbstractItemView>
+#include <QCompleter>
 #include <QEvent>
 #include <QKeyEvent>
-#include <QPointer>
 #include <QLabel>
-#include <QCompleter>
+#include <QPointer>
+#include <QRegularExpression>
 #include <QTextBrowser>
 #include <QVBoxLayout>
 
 #include "studio/documentation.hpp"
 
-void Documentation::insert(QString module, QString name, QString doc)
+namespace Studio {
+
+DocumentationPane::DocumentationPane(Documentation docs)
+    : m_search(new QLineEdit)
 {
-    docs[module][name].doc = doc;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
-QScopedPointer<Documentation> DocumentationPane::docs;
-QPointer<DocumentationPane> DocumentationPane::instance;
-
-DocumentationPane::DocumentationPane()
-    : search(new QLineEdit)
-{
-    Q_ASSERT(docs.data());
-
     // Flatten documentation into a single-level map
-    QMap<QString, QString> fs;
-    QMap<QString, QString> tags;
-    QMap<QString, QString> mods;
-    for (auto mod : docs->docs.keys())
+    QMap<QString, QString> fs;   // shape name -> docstring
+    QMap<QString, QString> tags; // shape name -> unique tag (used in search)
+    QMap<QString, QString> mods; // shape name -> module name
+    long max_name = 0;
+    for (auto mod : docs.keys())
     {
-        for (auto f : docs->docs[mod].keys())
+        for (auto f : docs[mod].keys())
         {
-            fs[f] = docs->docs[mod][f].doc;
-            tags.insert(f, "i" + QString::fromStdString(
-                        std::to_string(tags.size())));
+            fs.insert(f, docs[mod][f]);
+            tags.insert(f, QString("i%1").arg(tags.size()));
             mods.insert(f, mod);
+            max_name = std::max((long)f.length(), max_name);
         }
     }
 
-    int max_name = 0;
-    for (auto& f : fs.keys())
-    {
-        max_name = std::max(f.length(), max_name);
-    }
+    // The first word of the docstring should be the function name, which we
+    // use to detect aliases (where the name doesn't match)
+    QRegularExpression first_keyword(R"(^([\w\-_!?\*]+))");
 
     // Unpack documentation into a text box
     auto txt = new QTextBrowser();
@@ -70,14 +61,9 @@ DocumentationPane::DocumentationPane()
     {
         const auto doc = fs[f];
 
-        auto f_ = doc.count(" ") ? doc.split(" ")[0] : "";
-
         // Add padding so that the module names all line up
-        QString padding;
-        for (int i=0; i < max_name - f.length() + 4; ++i)
-        {
-            padding += "&nbsp;";
-        }
+        const auto padding = QString("&nbsp;")
+            .repeated(max_name - f.length() + 4);
 
         txt->insertHtml(
                 "<tt><a name=\"" + tags[f] +
@@ -85,37 +71,42 @@ DocumentationPane::DocumentationPane()
                 padding +
                 "<font color=\"silver\">" + mods[f] + "</font>" +
                 "</tt><br>");
-        if (f_ != f)
-        {
-            txt->insertHtml("<tt>" + f + "</tt>");
-            txt->insertHtml(": alias for ");
-            if (fs.count(f_) != 1)
+
+        const auto m = first_keyword.match(doc);
+        if (m.hasMatch()) {
+            const auto f_ = m.captured(0);
+            if (f != f_)
             {
-                std::cerr << "DocumentationPane: missing alias "
-                          << f_.toStdString() << " for " << f.toStdString()
-                          << std::endl;
-                txt->insertHtml("<tt>" + f_ + "</tt> (missing)\n");
+                txt->insertHtml("<tt>" + f + "</tt>: alias for ");
+                if (fs.count(f_) != 1)
+                {
+                    std::cerr << "DocumentationPane: missing alias "
+                              << f_.toStdString() << " for " << f.toStdString()
+                              << std::endl;
+                    txt->insertHtml("<tt>" + f_ + "</tt> (missing)\n");
+                }
+                else
+                {
+                    txt->insertHtml("<tt><a href=\"#" + tags[f_] + "\">" + f_ + "</a></tt><br>");
+                }
+                txt->insertPlainText("\n");
+            } else {
+                auto lines = doc.split("\n");
+                if (lines.size() > 0)
+                {
+                    txt->insertHtml("<tt>" + lines[0] + "</tt><br>");
+                }
+                for (int i=1; i < lines.size(); ++i)
+                {
+                    txt->insertPlainText(lines[i] + "\n");
+                }
+                txt->insertPlainText("\n");
             }
-            else
-            {
-                txt->insertHtml("<tt><a href=\"#" + tags[f_] + "\">" + f_ + "</a></tt><br>");
-            }
-            txt->insertPlainText("\n");
-        }
-        else
-        {
-            auto lines = doc.split("\n");
-            if (lines.size() > 0)
-            {
-                txt->insertHtml("<tt>" + lines[0] + "</tt><br>");
-            }
-            for (int i=1; i < lines.size(); ++i)
-            {
-                txt->insertPlainText(lines[i] + "\n");
-            }
-            txt->insertPlainText("\n");
+        } else {
+            txt->insertHtml("<tt>" + f + "</tt>: Bad docstring format<br><br>");
         }
     }
+
     {   // Erase the two trailing newlines
         auto cursor = QTextCursor(txt->document());
         cursor.movePosition(QTextCursor::End);
@@ -137,17 +128,18 @@ DocumentationPane::DocumentationPane()
     }
 
     // Build a search bar
-    auto completer = new QCompleter(fs.keys());
+    auto completer = new QCompleter(fs.keys(), this);
+
     completer->setCaseSensitivity(Qt::CaseInsensitive);
-    search->setCompleter(completer);
-    connect(completer, static_cast<void (QCompleter::*)(const QString&)>(&QCompleter::highlighted),
+    m_search->setCompleter(completer);
+    connect(completer, QOverload<const QString&>::of(&QCompleter::highlighted),
             txt, [=](const QString& str){
                 if (tags.count(str))
                 {
                     txt->scrollToAnchor(tags[str]);
                 }
             });
-    connect(search, &QLineEdit::textChanged, txt, [=](const QString& str){
+    connect(m_search, &QLineEdit::textChanged, txt, [=](const QString& str){
                 for (auto& t : tags.keys())
                 {
                     if (t.startsWith(str))
@@ -157,7 +149,7 @@ DocumentationPane::DocumentationPane()
                     }
                 }
             });
-    search->installEventFilter(this);
+    m_search->installEventFilter(this);
 
     auto layout = new QVBoxLayout();
     auto row = new QHBoxLayout;
@@ -165,9 +157,9 @@ DocumentationPane::DocumentationPane()
     row->addSpacing(5);
     row->addWidget(new QLabel("🔍  "));
     row->addSpacing(5);
-    row->addWidget(search);
+    row->addWidget(m_search);
     layout->addItem(row);
-    layout->setMargin(0);
+    layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
     setLayout(layout);
 
@@ -178,34 +170,19 @@ DocumentationPane::DocumentationPane()
     setWindowFlags(Qt::Tool | Qt::CustomizeWindowHint |
                    Qt::WindowTitleHint | Qt::WindowCloseButtonHint);
 #endif
-    setAttribute(Qt::WA_DeleteOnClose);
-
-    show();
-    search->setFocus();
 }
 
-void DocumentationPane::setDocs(Documentation* ds)
-{
-    docs.reset(ds);
+void DocumentationPane::show() {
+    QWidget::show();
+    m_search->setFocus();
+    m_search->selectAll();
 }
 
-bool DocumentationPane::hasDocs()
-{
-    return docs.data();
+void DocumentationPane::closeEvent(QCloseEvent* event) {
+    m_search->completer()->popup()->hide();
+    QWidget::closeEvent(event);
 }
 
-void DocumentationPane::open()
-{
-    if (instance.isNull())
-    {
-        instance = new DocumentationPane();
-    }
-    else
-    {
-        instance->show();
-        instance->search->setFocus();
-    }
-}
 bool DocumentationPane::eventFilter(QObject* object, QEvent* event)
 {
     Q_UNUSED(object);
@@ -213,7 +190,7 @@ bool DocumentationPane::eventFilter(QObject* object, QEvent* event)
     if (event->type() == QEvent::KeyPress &&
         static_cast<QKeyEvent*>(event)->key() == Qt::Key_Escape)
     {
-        deleteLater();
+        hide();
         return true;
     }
     else
@@ -221,3 +198,5 @@ bool DocumentationPane::eventFilter(QObject* object, QEvent* event)
         return false;
     }
 }
+
+}   // namespace Studio

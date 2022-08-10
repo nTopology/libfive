@@ -43,6 +43,10 @@ public:
 
     std::vector<libfive::Tree> dependencies() const override;
 
+    /*  Deduplicates and optimizes the underlying trees */
+    std::unique_ptr<const OracleClause> optimized(
+            std::unordered_map<TreeDataKey, Tree>& canonical) const override;
+
     bool serialize(Serializer& out) const;
     static std::unique_ptr<const OracleClause> deserialize(Deserializer& in);
 
