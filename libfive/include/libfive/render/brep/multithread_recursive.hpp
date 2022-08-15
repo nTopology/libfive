@@ -103,7 +103,7 @@ Out multithreadRecursive(Divisible                               root,
         list.run(task);
       }
       list.wait();
-      if (!tbb::task::current_context()->is_group_execution_cancelled()) {
+      if (!tbb::task::current_context() || !tbb::task::current_context()->is_group_execution_cancelled()) {
         post(std::move(root), locals.local());
       }
     }
@@ -120,7 +120,7 @@ Out multithreadRecursive(Divisible                               root,
       }
       assert(i == children.size());
       list.wait();
-      if (!tbb::task::current_context()->is_group_execution_cancelled()) {
+      if (!tbb::task::current_context() || !tbb::task::current_context()->is_group_execution_cancelled()) {
         post(std::move(root), out, locals.local());
       }
     }
