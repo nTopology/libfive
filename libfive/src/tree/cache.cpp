@@ -8,11 +8,13 @@ You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 #include <cassert>
 #include <cmath>
+#include <queue>
 
 #include "libfive/tree/cache.hpp"
 #include "libfive/eval/eval_array.hpp"
 
 namespace libfive {
+
 int Cache::shutdown()
 {
     auto mutPtr = mut();
@@ -87,7 +89,7 @@ Cache::Node Cache::operation(Opcode::Opcode op, Cache::Node lhs,
 #define CHECK_RETURN(func) { auto t = func(op, lhs, rhs); if (t.get() != nullptr) { return t; }}
         CHECK_RETURN(checkIdentity);
         CHECK_RETURN(checkCommutative);
-        //CHECK_RETURN(checkAffine);
+        CHECK_RETURN(checkAffine);
     }
 
     Key k(op, lhs.get(), rhs.get());
@@ -185,9 +187,13 @@ void Cache::del(Opcode::Opcode op, Node lhs, Node rhs)
     ops.erase(o);
 }
 
-std::map<Cache::Node, float> Cache::asAffine(Node n)
+std::map<Cache::Node, std::pair<float,int>> Cache::asAffine(Node n)
 {
-    std::map<Node, float> out;
+    auto trackedInsert = [](std::map<Node, std::pair<float, int>>&m, const std::pair<Node, float>& v) {
+      return m.insert({ v.first, { v.second, m.size() } });
+    };
+
+    std::map<Node, std::pair<float, int>> out;
 
     if (n->op == Opcode::OP_ADD)
     {
@@ -196,11 +202,11 @@ std::map<Cache::Node, float> Cache::asAffine(Node n)
         {
             if (out.find(i.first) == out.end())
             {
-                out.insert(i);
+                trackedInsert(out, { i.first, i.second.first });
             }
             else
             {
-                out[i.first] += i.second;
+                out[i.first].first += i.second.first;
             }
         }
     }
@@ -211,11 +217,11 @@ std::map<Cache::Node, float> Cache::asAffine(Node n)
         {
             if (out.find(i.first) == out.end())
             {
-                out.insert({i.first, -i.second});
+                trackedInsert(out, { i.first, -i.second.first });
             }
             else
             {
-                out[i.first] -= i.second;
+                out[i.first].first -= i.second.first;
             }
         }
     }
@@ -223,7 +229,7 @@ std::map<Cache::Node, float> Cache::asAffine(Node n)
     {
         for (const auto& i : asAffine(n->lhs))
         {
-            out.insert({i.first, -i.second});
+            trackedInsert(out, { i.first, -i.second.first });
         }
     }
     else if (n->op == Opcode::OP_MUL)
@@ -232,19 +238,19 @@ std::map<Cache::Node, float> Cache::asAffine(Node n)
         {
             for (const auto& i : asAffine(n->rhs))
             {
-                out.insert({i.first, i.second * n->lhs->value});
+                trackedInsert(out, { i.first, i.second.first * n->lhs->value });
             }
         }
         else if (n->rhs->op == Opcode::CONSTANT)
         {
             for (const auto& i : asAffine(n->lhs))
             {
-                out.insert({i.first, i.second * n->rhs->value});
+                trackedInsert(out, { i.first, i.second.first * n->rhs->value });
             }
         }
         else
         {
-            out.insert({n, 1});
+            trackedInsert(out, {n, 1});
         }
     }
     else if (n->op == Opcode::OP_DIV)
@@ -253,49 +259,63 @@ std::map<Cache::Node, float> Cache::asAffine(Node n)
         {
             for (const auto& i : asAffine(n->lhs))
             {
-                out.insert({i.first, i.second / n->rhs->value});
+                trackedInsert(out, { i.first, i.second.first / n->rhs->value });
             }
         }
         else
         {
-            out.insert({n, 1});
+            trackedInsert(out, {n, 1});
         }
     }
     else if (n->op == Opcode::CONSTANT)
     {
-        out.insert({constant(1), n->value});
+        trackedInsert(out, { constant(1), n->value });
     }
     else
     {
-        out.insert({n, 1});
+        trackedInsert(out, {n, 1});
     }
 
     return out;
 }
 
-Cache::Node Cache::fromAffine(const std::map<Node, float>& ns)
+Cache::Node Cache::fromAffine(const std::map<Node, std::pair<float, int>>& ns)
 {
-    std::map<float, std::list<Node>> cs;
+    //std::priority_queue<std::tuple<int, float, Node>, std::vector<std::tuple<int, float, Node>>> qs;
+    std::priority_queue<std::tuple<int, float, Node>> qs;
     for (const auto& n : ns)
     {
-        if (cs.find(n.second) == cs.end())
+      qs.push({(n.second).second, (n.second).first, n.first});
+    }
+
+    std::vector<std::pair<float, std::list<Node>>> vs;
+    std::map<float, int> cs;
+    for (; !qs.empty(); qs.pop())
+    {
+        const auto& q = qs.top();
+        auto k = std::get<1>(q);
+        auto l = std::get<2>(q);
+        if (cs.find(k) == cs.end())
         {
-            cs.insert({n.second, {}});
+            cs.insert({k, vs.size()});
+            vs.push_back({ k, {l} });
         }
-        cs.at(n.second).push_back(n.first);
+        else {
+            (vs[cs.at(k)].second).push_back(l);
+        }
     }
 
     std::list<std::pair<float, std::list<Node>>> pos;
     std::list<std::pair<float, std::list<Node>>> neg;
-    for (const auto& c : cs)
+    for (const auto& v : vs)
     {
-        if (c.first < 0)
+        if (v.first < 0)
         {
-            neg.push_back({-c.first, c.second});
+            neg.push_back({-v.first, v.second});
         }
-        else if (c.first > 0)
+        else if (v.first > 0)
         {
-            pos.push_back(c);
+            pos.push_back(v);
         }
     }
 
@@ -470,6 +490,10 @@ Cache::Node Cache::checkCommutative(Opcode::Opcode op, Cache::Node a, Cache::Nod
 
 Cache::Node Cache::checkAffine(Opcode::Opcode op, Node a_, Node b_)
 {
+    auto trackedInsert = [](std::map<Node, std::pair<float, int>>& m, const std::pair<Node, float>& v) {
+      return m.insert({ v.first, { v.second, m.size() } });
+    };
+
     if (op != Opcode::OP_ADD && op != Opcode::OP_SUB)
     {
         return Node();
@@ -484,19 +508,20 @@ Cache::Node Cache::checkAffine(Opcode::Opcode op, Node a_, Node b_)
         auto itr = a.find(k.first);
         if (itr != a.end())
         {
+            auto& ak = a.at(k.first);
             if (op == Opcode::OP_ADD)
             {
-                a.at(k.first) += k.second;
+                ak.first += (k.second).first;
             }
             else
             {
-                a.at(k.first) -= k.second;
+                ak.first -= (k.second).first;
             }
             overlap = true;
         }
         else
         {
-            a.insert({k.first, op == Opcode::OP_ADD ? k.second : -k.second});
+          trackedInsert(a, { k.first, op == Opcode::OP_ADD ? (k.second).first : -(k.second).first });
         }
     }
 
