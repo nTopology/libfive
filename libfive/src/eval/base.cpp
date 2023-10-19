@@ -16,7 +16,7 @@ namespace libfive {
 
 BaseEvaluator::BaseEvaluator(std::shared_ptr<Deck> deck,
                              const std::map<Tree::Id, float>& vars)
-    : deck(deck)
+    : deck(deck), name("libfive_raw")
 {
     for (auto& v : deck->vars.right)
     {

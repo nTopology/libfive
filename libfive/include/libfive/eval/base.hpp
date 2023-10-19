@@ -13,6 +13,7 @@ You can obtain one at http://mozilla.org/MPL/2.0/.
 #include <iostream>
 #include <map>
 #include <memory>
+#include <thread>
 
 #include "libfive/tree/tree.hpp"
 
@@ -35,8 +36,9 @@ public:
       auto          lifetime_us = microseconds.count();
 
       logfile << "{" << std::endl;
-      //logfile << "\t\"thread_id\":" << std::this_thread::get_id() << "," << std::endl;
-      logfile << "\t\"evaluator_id\":" << this << "," << std::endl;
+      logfile << "\t\"evaluator_name\":" << name << "," << std::endl;
+      logfile << "\t\"evaluator_id\":" << pointerToThis() << "," << std::endl;
+      logfile << "\t\"thread_id\":" << std::this_thread::get_id() << "," << std::endl;
       logfile << "\t\"z_height\":" << std::to_string(zHeight) << "," << std::endl;
 
       logfile << "\t\"time\": {" << std::endl;
@@ -68,6 +70,16 @@ public:
 
       logfile << "}," << std::endl;
     }
+    
+    void setName(std::string name)
+    {
+      this->name = name;
+    }
+
+    void* pointerToThis()
+    {
+      return this;
+    } 
 protected:
     std::shared_ptr<Deck> deck;
 
@@ -132,7 +144,8 @@ private:
   long long timeSetQueries      = 0;
   long long timeIsInsideQueries = 0;
 
-  std::string           logTimingFileName  = "c:/ntop_log/slice_timing_libfive.json";
+  std::string name;
+  std::string logTimingFileName  = "c:/ntop_log/slice_timing_libfive.json";
 };
 
 }   // namespace libfive
