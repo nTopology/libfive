@@ -194,6 +194,7 @@ set(five_sources
     ../include/libfive/oracle/transformed_oracle_clause.hpp
 
     ../include/libfive.h
+    ../include/log_utils.h
 )
 
 if(LIBFIVE_BUILD_STATIC_LIB)

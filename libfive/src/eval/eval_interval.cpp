@@ -7,6 +7,9 @@ This Source Code Form is subject to the terms of the Mozilla Public
 License, v. 2.0. If a copy of the MPL was not distributed with this file,
 You can obtain one at http://mozilla.org/MPL/2.0/.
 */
+
+#include <chrono>
+
 #include "libfive/eval/eval_interval.hpp"
 #include "libfive/eval/deck.hpp"
 #include "libfive/eval/tape.hpp"
@@ -70,6 +73,8 @@ Interval IntervalEvaluator::eval(
         const Eigen::Vector3f& upper,
         const Tape::Handle& tape)
 {
+    auto startTime = std::chrono::high_resolution_clock::now();
+
     assert(!lower.array().isNaN().any()); // A region's bounds should
     assert(!upper.array().isNaN().any()); // never be NaN.
 
@@ -91,6 +96,13 @@ Interval IntervalEvaluator::eval(
     deck->unbindOracles();
 
     auto root = tape->root();
+
+    auto endTime = std::chrono::high_resolution_clock::now();
+    auto microseconds = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime);
+    
+    zHeight = lower.z();
+    logIntervalQuery(microseconds.count());
+
     return i[root];
 }
 

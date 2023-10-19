@@ -47,7 +47,7 @@ Root<T> Root<T>::build(tbb::enumerable_thread_specific<Evaluator>& eval,
         Node* parent, unsigned childNo, bool& recurse, Local& local) {
         assert(region.level >= 0);
         Node out;
-        if (parent == nullptr) {
+        if (parent == nullptr) { // HARRISON: We are actually the root of the tree
             out.target = new T(nullptr, 0, region);
             out.vol = settings.vol;
             out.tape = local.eval.getDeck()->tape;

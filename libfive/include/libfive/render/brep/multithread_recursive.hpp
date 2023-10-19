@@ -22,7 +22,7 @@ namespace libfive {
   // iterable container of Divisibles with a size() method.
 
   // If Out is not void, PreCallable should have the signature 
-  // Out(Divisible, Out* par, unsigned childNo, bool& recurse, Local&); 
+  // Out* Divisible, Out* par, unsigned childNo, bool& recurse, Local&); 
   // par will be the parent of the current node, or nullptr if the current node 
   // is the root, and childNo will be which number child of that parent is
   // currently being handled (or undefined if the current node is the root).  

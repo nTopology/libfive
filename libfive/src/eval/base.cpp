@@ -28,7 +28,8 @@ BaseEvaluator::BaseEvaluator(std::shared_ptr<Deck> deck,
         else {
           deck->setVarInOracles(v.first, v.second);
         }
-    }    
+    }
+    creationTime = std::chrono::high_resolution_clock::now();
 }
 
 }   // namespace libfive

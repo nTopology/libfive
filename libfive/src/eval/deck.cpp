@@ -16,11 +16,14 @@ namespace libfive {
 
 Deck::Deck(const Tree root)
 {
+    // HARRISON: list of the nodes in the tree from leaves to root in rank order
     auto flat = root.ordered(true);
 
     // Helper function to create a new clause in the data array
     // The dummy clause (0) is mapped to the first result slot
     std::unordered_map<Tree::Id, Clause::Id> clauses = {{nullptr, 0}};
+
+    // HARRISON: id is just a reference to the ID of the node in flat, starts with the root node
     Clause::Id id = flat.size();
 
     // Helper function to make a new function
@@ -35,7 +38,7 @@ Deck::Deck(const Tree root)
     };
 
     // Write the flattened tree into the tape!
-    for (const auto& m : flat)
+    for (const auto& m : flat) // HARRISON: walk through in leaf-first order
     {
         // For oracles, store their position in the oracles vector
         // as the LHS of the clause, so that we can find them during

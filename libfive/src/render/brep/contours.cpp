@@ -17,6 +17,8 @@ You can obtain one at http://mozilla.org/MPL/2.0/.
 #include "libfive/render/brep/dc/dc_contourer.hpp"
 #include "libfive/render/brep/dc/dc_tree.hpp"
 #include "libfive/render/brep/dual.hpp"
+#include "log_utils.h"
+#include "tbb/global_control.h"
 
 namespace libfive {
 
@@ -26,10 +28,16 @@ std::unique_ptr<Contours> Contours::render(
         const Tree t, const Region<2>& r,
         const BRepSettings& settings)
 {
+    // Turn this on to limit the number of threads
+    tbb::global_control                        foo {tbb::global_control::max_allowed_parallelism, 1};
     tbb::enumerable_thread_specific<Evaluator> es([&t]() {return Evaluator(t); });
-
     // Create the quadtree on the scaffold
+    
+    auto startTime = std::chrono::high_resolution_clock::now();
     auto xtree = Root<DCTree<2>>::build(es, r, settings);
+    auto completedTime = std::chrono::high_resolution_clock::now();
+    auto milliSeconds  = std::chrono::duration_cast<std::chrono::milliseconds>(completedTime - startTime);
+    log_duration_ms("contours.cpp - build xtree", milliSeconds.count());
 
     // Abort early if the cancellation flag is set
     if (settings.cancel == true) {
@@ -37,7 +45,12 @@ std::unique_ptr<Contours> Contours::render(
     }
 
     // Perform marching squares, collecting into Contours
+    startTime = std::chrono::high_resolution_clock::now();
     auto cs = Dual<2>::walk<DCContourer>(xtree, settings);
+    completedTime = std::chrono::high_resolution_clock::now();
+    milliSeconds  = std::chrono::duration_cast<std::chrono::milliseconds>(completedTime - startTime);
+    log_duration_ms("contours.cpp - walk dual", milliSeconds.count());
+
     cs->bbox = r;
     return cs;
 }

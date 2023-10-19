@@ -103,7 +103,7 @@ Tape::Handle DCTree<N>::evalInterval(Evaluator* eval,
             tape);
 
     this->type = o.first.state();
-    if (!o.first.isSafe())
+    if (!o.first.isSafe()) // HARRISON: Interval may contain a nan
     {
         assert(this->type == Interval::AMBIGUOUS);
         return tape;

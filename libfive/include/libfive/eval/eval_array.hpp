@@ -9,6 +9,7 @@ You can obtain one at http://mozilla.org/MPL/2.0/.
 #pragma once
 
 #include <Eigen/Eigen>
+#include <chrono>
 
 #include "libfive/eval/base.hpp"
 #include "libfive/eval/deck.hpp"
@@ -32,6 +33,8 @@ public:
      */
     void set(const Eigen::Vector3f& p, size_t index)
     {
+        auto startTime = std::chrono::high_resolution_clock::now();
+        
         v(deck->X, index) = p.x();
         v(deck->Y, index) = p.y();
         v(deck->Z, index) = p.z();
@@ -40,6 +43,10 @@ public:
         {
             o->set(p, index);
         }
+
+        auto endTime = std::chrono::high_resolution_clock::now();
+        auto microseconds = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime);
+        logSetQuery(microseconds.count());
     }
 
     /*

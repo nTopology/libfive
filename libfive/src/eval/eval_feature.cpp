@@ -57,6 +57,7 @@ bool FeatureEvaluator::isInside(const Eigen::Vector3f& p,
                                 const Tape::Handle& tape)
 {
     auto handle = valueAndPush(p, tape);
+    auto startTime = std::chrono::high_resolution_clock::now();
 
     // Unambiguous cases
     if (handle.first < 0) {
@@ -114,6 +115,10 @@ bool FeatureEvaluator::isInside(const Eigen::Vector3f& p,
     }
     const bool outside = pos && !neg;
 
+    auto endTime = std::chrono::high_resolution_clock::now();
+    auto microseconds = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime);
+    logIsInsideQuery(microseconds.count());
+
     return !outside;
 }
 
@@ -129,6 +134,9 @@ const boost::container::small_vector<Feature, 4>&
 {
     // Load the location into the results slot and evaluate point-wise
     auto handle = valueAndPush(p, tape);
+    
+    auto startTime = std::chrono::high_resolution_clock::now();
+
     filled = 1;
 
     // Evaluate feature-wise
@@ -145,7 +153,10 @@ const boost::container::small_vector<Feature, 4>&
     if (handle.second != tape) {
         deck->claim(std::move(handle.second));
     }
-
+    
+    auto endTime = std::chrono::high_resolution_clock::now();
+    auto microseconds = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime);
+    logFeaturesQueryDuration(microseconds.count());
     return f(root);
 }
 
@@ -165,6 +176,7 @@ std::list<Eigen::Vector3f> FeatureEvaluator::features(
         const Tape::Handle& tape)
 {
     // Deduplicate and return the result
+    logFeaturesQuery();
     std::list<Eigen::Vector3f> out;
     for (auto& o : features_(p, tape))
     {
