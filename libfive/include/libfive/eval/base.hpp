@@ -32,12 +32,17 @@ public:
     {
       auto          destructionTime      = std::chrono::high_resolution_clock::now();
       auto          microseconds = std::chrono::duration_cast<std::chrono::microseconds>(destructionTime - creationTime);
+      
+      auto now = std::chrono::system_clock::now();
+      auto UTC = std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count();
+      auto logTimingFileName = "c:/ntop_log/slice_timing_libfive-" + std::to_string(UTC) +".json";
+
       std::ofstream logfile(logTimingFileName, std::ios::app | std::ios::out);
       auto          lifetime_us = microseconds.count();
 
       logfile << "{" << std::endl;
-      logfile << "\t\"evaluator_name\":" << name << "," << std::endl;
-      logfile << "\t\"evaluator_id\":" << pointerToThis() << "," << std::endl;
+      logfile << "\t\"evaluator_name\":\"" << name << "\"," << std::endl;
+      logfile << "\t\"evaluator_id\":\"" << pointerToThis() << "\"," << std::endl;
       logfile << "\t\"thread_id\":" << std::this_thread::get_id() << "," << std::endl;
       logfile << "\t\"z_height\":" << std::to_string(zHeight) << "," << std::endl;
 
@@ -146,7 +151,7 @@ private:
   long long timeIsInsideQueries = 0;
 
   std::string name;
-  std::string logTimingFileName  = "c:/ntop_log/slice_timing_libfive.json";
+  // std::string logTimingFileName  = "c:/ntop_log/slice_timing_libfive.json";
 };
 
 }   // namespace libfive

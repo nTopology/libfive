@@ -46,9 +46,9 @@ auto stringy(std::array<T, N> const& arr)
 
 // Totally braindead but simple logging; we can think of something fancier if there's a need
 
-std::string log_filepath = "c:/ntop_log/libfive_instrumentation.txt";
+std::string log_filepath = "c:/ntop_log/libfive_contours_instrumentation.json";
 
-std::string access_pattern_filepath = "c:/ntop_log/libfive_accesspattern.txt";
+//std::string access_pattern_filepath = "c:/ntop_log/libfive_accesspattern.txt";
 
 template <typename... Ts>
 void pre_hook(Ts&&... ts)
@@ -84,11 +84,18 @@ void log(std::array<std::string, N>& arr)
   file << std::endl;
 }
 
-void log_duration_ms(std::string comment, long long ms)
+void log_build_walk_duration_us(long long build_us, long long walk_us)
 {
   std::fstream file {log_filepath, file.app | file.out};
+  auto now = std::chrono::system_clock::now();
+  auto UTC = std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count();
   
-  file << comment << ":" << std::to_string(ms) << " ms"<< std::endl;
+  file << "{" << std::endl <<
+    "\t\"wallclock\":" << std::to_string(UTC) << "," << std::endl <<
+    "\t\"total_us\":" << std::to_string(build_us + walk_us) << "," << std::endl <<
+    "\t\"build_us\":" << std::to_string(build_us) << "," << std::endl <<
+    "\t\"walk_us\":" << std::to_string(walk_us) << std::endl
+    << "}," << std::endl;
 }
 
 

@@ -29,15 +29,14 @@ std::unique_ptr<Contours> Contours::render(
         const BRepSettings& settings)
 {
     // Turn this on to limit the number of threads
-    tbb::global_control                        foo {tbb::global_control::max_allowed_parallelism, 1};
+    tbb::global_control                        foo {tbb::global_control::max_allowed_parallelism, 2};
     tbb::enumerable_thread_specific<Evaluator> es([&t]() {return Evaluator(t); });
     // Create the quadtree on the scaffold
     
     auto startTime = std::chrono::high_resolution_clock::now();
     auto xtree = Root<DCTree<2>>::build(es, r, settings);
     auto completedTime = std::chrono::high_resolution_clock::now();
-    auto milliSeconds  = std::chrono::duration_cast<std::chrono::milliseconds>(completedTime - startTime);
-    log_duration_ms("contours.cpp - build xtree", milliSeconds.count());
+    auto build_microseconds  = std::chrono::duration_cast<std::chrono::microseconds>(completedTime - startTime);
 
     // Abort early if the cancellation flag is set
     if (settings.cancel == true) {
@@ -48,8 +47,9 @@ std::unique_ptr<Contours> Contours::render(
     startTime = std::chrono::high_resolution_clock::now();
     auto cs = Dual<2>::walk<DCContourer>(xtree, settings);
     completedTime = std::chrono::high_resolution_clock::now();
-    milliSeconds  = std::chrono::duration_cast<std::chrono::milliseconds>(completedTime - startTime);
-    log_duration_ms("contours.cpp - walk dual", milliSeconds.count());
+    auto walk_microseconds  = std::chrono::duration_cast<std::chrono::microseconds>(completedTime - startTime);
+
+    log_build_walk_duration_us(build_microseconds.count(), walk_microseconds.count());
 
     cs->bbox = r;
     return cs;

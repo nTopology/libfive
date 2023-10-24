@@ -62,6 +62,9 @@ public:
     { return t.crend(); }
 
     Clause::Id root() const { return i; }
+    Type type;
+    /*  These bounds are only valid if type == INTERVAL  */
+    Interval X, Y, Z;
 
 protected:
     /*  The tape itself, as a vector of clauses  */
@@ -74,9 +77,6 @@ protected:
     /*  Root clause of the tape  */
     Clause::Id i;
 
-    /*  These bounds are only valid if type == INTERVAL  */
-    Interval X, Y, Z;
-    Type type;
 
     /*  If terminal is true, then the tape contains no min/max clauses
      *  so cannot be specialized further */

@@ -64,6 +64,9 @@ public:
 
     /*  This is the number of samples that we can process in one pass */
     static constexpr size_t N=LIBFIVE_EVAL_ARRAY_SIZE;
+    
+    /*  v(clause, index) is a specific data point */
+    Eigen::Array<float, Eigen::Dynamic, N, Eigen::RowMajor> v;
 
 protected:
     /*  Stored in values() and used in operator() to decide how much of the
@@ -75,8 +78,6 @@ protected:
     /*  Sets count_simd and count_actual based on count */
     void setCount(size_t count);
 
-    /*  v(clause, index) is a specific data point */
-    Eigen::Array<float, Eigen::Dynamic, N, Eigen::RowMajor> v;
 
     /*  ambig(index) returns whether a particular slot is ambiguous */
     Eigen::Array<bool, 1, N> ambig;

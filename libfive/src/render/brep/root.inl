@@ -32,6 +32,7 @@ Root<T> Root<T>::build(tbb::enumerable_thread_specific<Evaluator>& eval,
         typename T::Pool object_pool;
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     };
+    
     tbb::enumerable_thread_specific<Local> locals(
         [&eval]() { return Local{ eval.local() }; });
 
