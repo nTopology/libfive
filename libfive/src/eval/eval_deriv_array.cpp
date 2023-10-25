@@ -102,7 +102,7 @@ Eigen::Block<decltype(DerivArrayEvaluator::out), 4, Eigen::Dynamic>
 DerivArrayEvaluator::derivs(size_t count, const Tape& tape)
 {
     
-    auto startTime = std::chrono::high_resolution_clock::now();
+    //auto startTime = std::chrono::high_resolution_clock::now();
     // Perform value evaluation, copying results into the 4th row of out
     out.row(3).head(count) = values(count, tape);
 
@@ -115,12 +115,10 @@ DerivArrayEvaluator::derivs(size_t count, const Tape& tape)
 
     // Return a block of valid results from the out array
     out.topLeftCorner(3, count) = d(tape.root()).leftCols(count);
-
-    
-
-    auto endTime = std::chrono::high_resolution_clock::now();
-    auto microseconds = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime);
-    logDerivsQuery(microseconds.count());
+   
+    //auto endTime = std::chrono::high_resolution_clock::now();
+    //auto microseconds = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime);
+    //logDerivsQuery(microseconds.count());
 
     return out.block<4, Eigen::Dynamic>(0, 0, 4, count);
 }

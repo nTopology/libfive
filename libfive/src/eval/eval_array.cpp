@@ -62,7 +62,7 @@ float ArrayEvaluator::value(const Eigen::Vector3f& pt) {
 float ArrayEvaluator::value(const Eigen::Vector3f& pt,
                             const Tape& tape)
 {
-    logValueQuery();
+    //logValueQuery();
     set(pt, 0);
     return values(1, tape)(0);
 }
@@ -104,7 +104,7 @@ void ArrayEvaluator::setCount(size_t count)
 Eigen::Block<decltype(ArrayEvaluator::v), 1, Eigen::Dynamic>
 ArrayEvaluator::values(size_t count, const Tape& tape)
 {
-    auto startTime = std::chrono::high_resolution_clock::now();
+    //auto startTime = std::chrono::high_resolution_clock::now();
     setCount(count);
 
     deck->bindOracles(tape, this);
@@ -113,9 +113,9 @@ ArrayEvaluator::values(size_t count, const Tape& tape)
     }
     deck->unbindOracles();
 
-    auto endTime = std::chrono::high_resolution_clock::now();
-    auto microseconds = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime);
-    logValuesQuery(microseconds.count());
+    //auto endTime = std::chrono::high_resolution_clock::now();
+    //auto microseconds = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime);
+    //logValuesQuery(microseconds.count());
 
     return v.block<1, Eigen::Dynamic>(tape.root(), 0, 1, count);
 }

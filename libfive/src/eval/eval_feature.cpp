@@ -135,7 +135,7 @@ const boost::container::small_vector<Feature, 4>&
     // Load the location into the results slot and evaluate point-wise
     auto handle = valueAndPush(p, tape);
     
-    auto startTime = std::chrono::high_resolution_clock::now();
+    //auto startTime = std::chrono::high_resolution_clock::now();
 
     filled = 1;
 
@@ -154,9 +154,9 @@ const boost::container::small_vector<Feature, 4>&
         deck->claim(std::move(handle.second));
     }
     
-    auto endTime = std::chrono::high_resolution_clock::now();
-    auto microseconds = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime);
-    logFeaturesQueryDuration(microseconds.count());
+    //auto endTime = std::chrono::high_resolution_clock::now();
+    //auto microseconds = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime);
+    //logFeaturesQueryDuration(microseconds.count());
     return f(root);
 }
 
@@ -176,7 +176,7 @@ std::list<Eigen::Vector3f> FeatureEvaluator::features(
         const Tape::Handle& tape)
 {
     // Deduplicate and return the result
-    logFeaturesQuery();
+    //logFeaturesQuery();
     std::list<Eigen::Vector3f> out;
     for (auto& o : features_(p, tape))
     {

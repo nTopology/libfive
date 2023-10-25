@@ -86,17 +86,18 @@ void log(std::array<std::string, N>& arr)
 
 void log_build_walk_duration_us(long long build_us, long long walk_us)
 {
-  std::fstream file {log_filepath, file.app | file.out};
-  auto now = std::chrono::system_clock::now();
-  auto UTC = std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count();
-  
-  file << "{" << std::endl <<
-    "\t\"wallclock\":" << std::to_string(UTC) << "," << std::endl <<
-    "\t\"total_us\":" << std::to_string(build_us + walk_us) << "," << std::endl <<
-    "\t\"build_us\":" << std::to_string(build_us) << "," << std::endl <<
-    "\t\"walk_us\":" << std::to_string(walk_us) << std::endl
-    << "}," << std::endl;
-}
+
+//  std::fstream file {log_filepath, file.app | file.out};
+//  auto now = std::chrono::system_clock::now();
+//  auto UTC = std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count();
+//  
+//  file << "{" << std::endl <<
+//    "\t\"wallclock\":" << std::to_string(UTC) << "," << std::endl <<
+//    "\t\"total_us\":" << std::to_string(build_us + walk_us) << "," << std::endl <<
+//    "\t\"build_us\":" << std::to_string(build_us) << "," << std::endl <<
+//    "\t\"walk_us\":" << std::to_string(walk_us) << std::endl
+//    << "}," << std::endl;
+//}
 
 
 

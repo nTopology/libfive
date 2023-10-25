@@ -73,7 +73,7 @@ Interval IntervalEvaluator::eval(
         const Eigen::Vector3f& upper,
         const Tape::Handle& tape)
 {
-    auto startTime = std::chrono::high_resolution_clock::now();
+    //auto startTime = std::chrono::high_resolution_clock::now();
 
     assert(!lower.array().isNaN().any()); // A region's bounds should
     assert(!upper.array().isNaN().any()); // never be NaN.
@@ -97,11 +97,11 @@ Interval IntervalEvaluator::eval(
 
     auto root = tape->root();
 
-    auto endTime = std::chrono::high_resolution_clock::now();
-    auto microseconds = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime);
-    
-    zHeight = lower.z();
-    logIntervalQuery(microseconds.count());
+    //auto endTime = std::chrono::high_resolution_clock::now();
+    //auto microseconds = std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime);
+    //
+    //zHeight = lower.z();
+    //logIntervalQuery(microseconds.count());
 
     return i[root];
 }
