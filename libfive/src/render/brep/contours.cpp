@@ -29,7 +29,7 @@ std::unique_ptr<Contours> Contours::render(
         const BRepSettings& settings)
 {
     // Turn this on to limit the number of threads
-    tbb::global_control                        foo {tbb::global_control::max_allowed_parallelism, 2};
+    //tbb::global_control                        foo {tbb::global_control::max_allowed_parallelism, 2};
     tbb::enumerable_thread_specific<Evaluator> es([&t]() {return Evaluator(t); });
     // Create the quadtree on the scaffold
     

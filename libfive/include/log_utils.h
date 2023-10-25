@@ -106,6 +106,6 @@ void log_build_walk_duration_us(long long build_us, long long walk_us)
 //   std::fstream file {access_pattern_filepath, file.app | file.out};
   
 //   file <<std::to_string(ms) << " ms"<< std::endl;
-// }
+}
 
 }  // namespace ntop
