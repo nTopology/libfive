@@ -802,7 +802,7 @@ double DCTree<N>::findVertex(unsigned index)
     Vec v = AtAp * (this->leaf->AtB - (this->leaf->AtA * center)) + center;
 
     // Store this specific vertex in the verts matrix
-    this->leaf->verts.col(index) = v;
+    this->leaf->verts.col(index) =  center;
 
     // Return the QEF error
     return (v.transpose() * this->leaf->AtA * v -
