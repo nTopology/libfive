@@ -229,7 +229,7 @@ public:
      *  floating-point accuracy.
      */
     Region<N> withResolution(double min_feature) const {
-        const auto min_dimension = (upper - lower).minCoeff();
+        const auto min_dimension = 1.0;// (upper - lower).minCoeff();
         const auto level = ceil(fmax(0.0, log(min_dimension / min_feature)) /
                                 log(2));
         return Region<N>(lower, upper, perp, level);
