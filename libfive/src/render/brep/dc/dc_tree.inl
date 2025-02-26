@@ -799,15 +799,17 @@ double DCTree<N>::findVertex(unsigned index)
     auto AtAp = (U * D * U.transpose()).eval();
 
     // Solve for vertex position (minimizing distance to center)
-    Vec v = AtAp * (this->leaf->AtB - (this->leaf->AtA * center)) + center;
+    Vec v = center; // AtAp* (this->leaf->AtB - (this->leaf->AtA * center)) + center;
 
     // Store this specific vertex in the verts matrix
     this->leaf->verts.col(index) = v;
 
-    // Return the QEF error
-    return (v.transpose() * this->leaf->AtA * v -
-            2*v.transpose() * this->leaf->AtB)[0]
-            + this->leaf->BtB;
+    //// Return the QEF error
+    //return (v.transpose() * this->leaf->AtA * v -
+    //        2*v.transpose() * this->leaf->AtB)[0]
+    //        + this->leaf->BtB;
+    return std::numeric_limits<double>::max();
+
 }
 
 ////////////////////////////////////////////////////////////////////////////////
