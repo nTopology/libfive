@@ -17,6 +17,7 @@ You can obtain one at http://mozilla.org/MPL/2.0/.
 #include "libfive/render/brep/root.hpp"
 #include "libfive/render/axes.hpp"
 #include "util/shapes.hpp"
+#include <chrono>
 
 using namespace libfive;
 
