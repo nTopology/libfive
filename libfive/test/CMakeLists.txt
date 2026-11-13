@@ -17,6 +17,7 @@ set(SRCS main.cpp
     marching.cpp
     manifold_tables.cpp
     mesh.cpp
+    multithread_recursive.cpp
     neighbors.cpp
     object_pool.cpp
     oracle.cpp
