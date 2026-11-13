@@ -17,6 +17,35 @@ You can obtain one at http://mozilla.org/MPL/2.0/.
 
 namespace libfive {
 
+namespace detail {
+
+  // TBB 2019 shim (delete once turbo is on oneTBB, nTopology/turbo#19518):
+  // in 2019 a task_group constructed in a task run directly by the master
+  // thread's outermost wait is isolated, so a cancel of an enclosing group
+  // never reaches it.  Capture the caller's context once, at the entry
+  // point, and also check it at every node (the old tbb::task code shared
+  // it between all nodes).  tbb::task reaches this header via
+  // <tbb/task_group.h> on 2019U6.
+#if TBB_INTERFACE_VERSION < 12000
+  struct CallerCtx {
+    tbb::task_group_context* ctx = tbb::task::self().group();
+    bool cancelled() const { return ctx->is_group_execution_cancelled(); }
+  };
+#else
+  struct CallerCtx {
+    bool cancelled() const { return false; }
+  };
+#endif
+
+  template <class Divisible, class Out, class Local,
+    class PreCallable, class PostCallable>
+    Out multithreadRecursiveImpl(
+      Divisible root, tbb::enumerable_thread_specific<Local>& locals,
+      const PreCallable& pre, const PostCallable& post,
+      Out* parent, unsigned childNo, const CallerCtx& callerCtx);
+
+}   // namespace detail
+
 
   // Calls Callable on Divisible, recursing over its children.  
 
@@ -55,22 +84,19 @@ namespace libfive {
     Out multithreadRecursive(
       Divisible root, tbb::enumerable_thread_specific<Local>& locals,
       const PreCallable& pre, const PostCallable& post,
-      Out* parent = nullptr, unsigned childNo = -1
-#if TBB_INTERFACE_VERSION < 12000
-      , tbb::task_group_context* callerCtx = nullptr
-#endif
-      ) {
-#if TBB_INTERFACE_VERSION < 12000
-    // TBB 2019 shim (delete once turbo is on oneTBB, nTopology/turbo#19518):
-    // in 2019 a task_group constructed in a task run directly by the master
-    // thread's outermost wait is isolated, so a cancel of an enclosing group
-    // never reaches it.  Capture the caller's context once, at the entry
-    // point, and also check it at every node (the old tbb::task code shared
-    // it between all nodes).
-    if (callerCtx == nullptr) {
-      callerCtx = tbb::task::self().group();
-    }
-#endif
+      Out* parent = nullptr, unsigned childNo = -1) {
+    return detail::multithreadRecursiveImpl(
+      root, locals, pre, post, parent, childNo, detail::CallerCtx());
+  }
+
+namespace detail {
+
+  template <class Divisible, class Out, class Local,
+    class PreCallable, class PostCallable>
+    Out multithreadRecursiveImpl(
+      Divisible root, tbb::enumerable_thread_specific<Local>& locals,
+      const PreCallable& pre, const PostCallable& post,
+      Out* parent, unsigned childNo, const CallerCtx& callerCtx) {
 
     struct Task {
       Divisible root;
@@ -79,43 +105,21 @@ namespace libfive {
       const PostCallable& post;
       Out* parent;
       unsigned childNo;
-#if TBB_INTERFACE_VERSION < 12000
-      tbb::task_group_context* callerCtx;
-#endif
+      CallerCtx callerCtx;
 
       Task(Divisible root, tbb::enumerable_thread_specific<Local>& locals,
         const PreCallable& pre, const PostCallable& post,
-        Out* parent = nullptr, unsigned childNo = -1
-#if TBB_INTERFACE_VERSION < 12000
-        , tbb::task_group_context* callerCtx = nullptr
-#endif
-        )
+        Out* parent, unsigned childNo, const CallerCtx& callerCtx)
         : root(root), locals(locals), pre(pre), post(post),
-        parent(parent), childNo(childNo)
-#if TBB_INTERFACE_VERSION < 12000
-        , callerCtx(callerCtx)
-#endif
-        {}
+        parent(parent), childNo(childNo), callerCtx(callerCtx) {}
 
       void operator()() const {
-        multithreadRecursive(
-          root, locals, pre, post, parent, childNo
-#if TBB_INTERFACE_VERSION < 12000
-          , callerCtx
-#endif
-          );
+        multithreadRecursiveImpl(
+          root, locals, pre, post, parent, childNo, callerCtx);
       }
     };
 
     bool toRecurse;
-    // True if post must be skipped because of a tbb cancellation.
-    auto isCancelled = [&](tbb::task_group_status status) {
-#if TBB_INTERFACE_VERSION < 12000
-      return status == tbb::canceled || callerCtx->is_group_execution_cancelled();
-#else
-      return status == tbb::canceled;
-#endif
-    };
     auto getChildren = [&root]() {
       if constexpr (std::is_pointer_v<Divisible>) {
         return root->getChildren();
@@ -133,15 +137,9 @@ namespace libfive {
         for (auto& child : children) {
           // We don't need to set parent and childNo, since when Out is
           // void they are not used.
-          tg.run(Task(child, locals, pre, post, nullptr, -1
-#if TBB_INTERFACE_VERSION < 12000
-                      , callerCtx
-#endif
-                      ));
+          tg.run(Task(child, locals, pre, post, nullptr, -1, callerCtx));
         }
-        // wait() returns tbb::canceled if the group (or an enclosing group
-        // whose context this one is bound to) was cancelled.
-        if (!isCancelled(tg.wait())) {
+        if (tg.wait() != tbb::canceled && !callerCtx.cancelled()) {
           post(std::move(root), locals.local());
         }
       }
@@ -153,19 +151,17 @@ namespace libfive {
         tbb::task_group tg;
         auto i = 0;
         for (auto& child : children) {
-          tg.run(Task(child, locals, pre, post, &out, i++
-#if TBB_INTERFACE_VERSION < 12000
-                      , callerCtx
-#endif
-                      ));
+          tg.run(Task(child, locals, pre, post, &out, i++, callerCtx));
         }
         assert(i == children.size());
-        if (!isCancelled(tg.wait())) {
+        if (tg.wait() != tbb::canceled && !callerCtx.cancelled()) {
           post(std::move(root), out, locals.local());
         }
       }
       return out;
     }
   }
+
+}   // namespace detail
 
 }   // namespace libfive
