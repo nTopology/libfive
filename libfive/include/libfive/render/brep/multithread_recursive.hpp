@@ -19,37 +19,16 @@ namespace libfive {
 
 namespace detail {
 
-  // CallerCtx: cancellation shim for TBB 2019 (TBB_INTERFACE_VERSION < 12000).
-  // DELETE THIS WHOLE STRUCT once turbo is on oneTBB (nTopology/turbo#19518,
-  // the oneTBB switch); the recursion then relies on tg.wait() alone.
-  //
-  // Why it exists: the old tbb::task implementation shared one
-  // task_group_context between every node of the recursion, so cancelling
-  // the caller's group/context stopped the whole tree.  After the port to
-  // tbb::task_group each branch node owns a task_group.  On TBB 2019U6, a
-  // task_group constructed inside a task that the master thread runs
-  // directly from its outermost wait gets an isolated context, so cancelling
-  // an enclosing group/context never reaches these nested groups and
-  // tg.wait() would not report it.
-  //
-  // What it does: multithreadRecursive() (the public entry point) constructs
-  // one CallerCtx, which captures the task_group_context of the task that is
-  // executing at that moment (tbb::task::self().group()).  The same object
-  // is copied down to every node, and each node checks cancelled() in
-  // addition to `tg.wait() == tbb::canceled` before calling post().  It is
-  // captured once at entry, so it only reflects the context seen there; it
-  // does not track contexts of groups created further down.
-  //
-  // tbb::task reaches this header via <tbb/task_group.h> on 2019U6.
+  // TBB 2019 shim; delete with the oneTBB switch (nTopology/turbo#19518).
+  // Captures the caller's context once at entry, so cancelling an outer
+  // group is not seen if the entry runs under run_and_wait (same as before).
 #if TBB_INTERFACE_VERSION < 12000
   struct CallerCtx {
     tbb::task_group_context* ctx = tbb::task::self().group();
     bool cancelled() const { return ctx->is_group_execution_cancelled(); }
   };
 #else
-  // oneTBB: a task_group_context binds to its parent context by default, so
-  // cancelling an enclosing group propagates to the nested groups and
-  // tg.wait() reports it.  Nothing extra to check, hence always false.
+  // oneTBB: rely on tg.wait(); nothing extra to check.
   struct CallerCtx {
     bool cancelled() const { return false; }
   };
